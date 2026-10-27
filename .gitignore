@@ -7,11 +7,12 @@ venv/
 .ruff_cache/
 
 # data & artefacts (versioned with DVC / MLflow, not git)
-data/
-outputs/
-reports/
-models/
-mlruns/
+# Leading "/" = repo root only, so the code packages src/cxr/data and src/cxr/models stay tracked.
+/data/
+/outputs/
+/reports/
+/models/
+/mlruns/
 mlflow.db
 *.ckpt
 *.onnx
