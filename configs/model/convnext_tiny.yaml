@@ -1,0 +1,6 @@
+# run with: python -m cxr.train model=convnext_tiny train.lr=1e-4 train.batch_size=48
+name: convnext_tiny
+backbone: convnext_tiny.fb_in22k_ft_in1k
+pretrained: true
+drop_rate: 0.2
+img_size: 224

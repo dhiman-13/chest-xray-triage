@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LungLens · Chest X-ray Triage</title>
+  <meta name="description" content="AI-assisted chest X-ray triage with explainable heatmaps. Research demo.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230ea5a4'/%3E%3Cpath d='M16 6v9M16 15c-2 0-3 2-5 2-3 0-5 3-5 7 0 2 1 3 3 3 4 0 7-3 7-7m0-5c2 0 3 2 5 2 3 0 5 3 5 7 0 2-1 3-3 3-4 0-7-3-7-7' stroke='white' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9"/><path d="M16 6v9M16 15c-2 0-3 2-5 2-3 0-5 3-5 7 0 2 1 3 3 3 4 0 7-3 7-7m0-5c2 0 3 2 5 2 3 0 5 3 5 7 0 2-1 3-3 3-4 0-7-3-7-7"/></svg>
+      <div>
+        <div class="brand-name">LungLens</div>
+        <div class="brand-sub">Chest X-ray triage</div>
+      </div>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-view="analyze" role="tab">Analyze</button>
+      <button class="tab" data-view="monitor" role="tab">Monitoring</button>
+      <button class="tab" data-view="model" role="tab">Model card</button>
+    </nav>
+    <div class="status" id="status"><span class="dot"></span><span id="status-text">Connecting…</span></div>
+  </header>
+
+  <main>
+    <!-- ANALYZE -->
+    <section class="view active" id="view-analyze">
+      <div class="analyze-grid">
+        <div class="card viewer-card">
+          <div class="card-head">
+            <h2>Radiograph</h2>
+            <div class="viewer-tools" id="viewer-tools" hidden>
+              <label class="switch"><input type="checkbox" id="heat-toggle" checked><span></span>Heatmap</label>
+              <label class="slider-label">Opacity <input type="range" id="heat-opacity" min="0" max="100" value="55"></label>
+              <button class="btn ghost small" id="reset-btn">New image</button>
+            </div>
+          </div>
+
+          <label class="dropzone" id="dropzone">
+            <input type="file" id="file-input" accept="image/png,image/jpeg" hidden>
+            <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 31V13m0 0-7 7m7-7 7 7M10 33v4a3 3 0 0 0 3 3h22a3 3 0 0 0 3-3v-4"/></svg>
+            <div class="dz-title">Drop a chest X-ray here</div>
+            <div class="dz-sub">Frontal PA/AP view · PNG or JPEG · up to 15 MB</div>
+            <span class="btn primary">Choose file</span>
+            <div class="dz-note">Images are processed in memory and never stored.</div>
+          </label>
+
+          <div class="stage" id="stage" hidden>
+            <canvas id="canvas" width="512" height="512"></canvas>
+            <div class="scan" id="scan"><div class="scan-line"></div><span>Analyzing…</span></div>
+            <div class="heat-caption" id="heat-caption"></div>
+            <div class="legend"><span>low</span><i></i><span>high attention</span></div>
+          </div>
+        </div>
+
+        <div class="results-col">
+          <div class="card triage-card" id="triage-card">
+            <div class="placeholder">
+              <div class="ph-icon">◎</div>
+              <p>Upload a radiograph to get a triage recommendation, per-finding probabilities and an explanation heatmap.</p>
+              <ul class="steps">
+                <li><b>1</b> Upload image</li>
+                <li><b>2</b> Model scores 14 findings</li>
+                <li><b>3</b> Review heatmaps &amp; give feedback</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="card" id="findings-card" hidden>
+            <div class="card-head">
+              <h2>Findings</h2>
+              <span class="hint">Click a finding to see where the model looked</span>
+            </div>
+            <ul class="findings" id="findings"></ul>
+            <div class="threshold-key"><i></i> operating threshold (set for 90% sensitivity on validation data)</div>
+          </div>
+
+          <div class="card" id="feedback-card" hidden>
+            <div class="card-head"><h2>Radiologist feedback</h2></div>
+            <p class="muted">Feedback is logged with the prediction and becomes labelled data for the next retraining cycle.</p>
+            <div class="fb-buttons">
+              <button class="btn ok" data-verdict="agree">✓ Agree</button>
+              <button class="btn bad" data-verdict="disagree">✕ Disagree</button>
+            </div>
+            <form id="fb-form" hidden>
+              <div class="muted small">Which findings are actually present?</div>
+              <div class="chips" id="fb-labels"></div>
+              <textarea id="fb-comment" rows="2" placeholder="Optional comment"></textarea>
+              <button class="btn primary" type="submit">Submit feedback</button>
+            </form>
+            <div class="fb-done" id="fb-done" hidden>Thanks, feedback recorded.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MONITORING -->
+    <section class="view" id="view-monitor">
+      <div class="section-head">
+        <div>
+          <h1>Production monitoring</h1>
+          <p class="muted">Live statistics from the prediction log (last 24 hours). Full time-series dashboards run in Grafana.</p>
+        </div>
+        <div class="head-links">
+          <a class="btn ghost small" href="/metrics" target="_blank">Prometheus /metrics</a>
+          <a class="btn ghost small" href="/docs" target="_blank">API docs</a>
+          <button class="btn ghost small" id="refresh-btn">Refresh</button>
+        </div>
+      </div>
+      <div class="kpis" id="kpis"></div>
+      <div class="mon-grid">
+        <div class="card"><div class="card-head"><h2>Studies per hour</h2></div><div class="hours" id="hours"></div></div>
+        <div class="card"><div class="card-head"><h2>Triage mix</h2></div><div id="triage-mix"></div></div>
+        <div class="card"><div class="card-head"><h2>Flagged findings</h2></div><div class="hbars" id="flag-bars"></div></div>
+        <div class="card wide">
+          <div class="card-head"><h2>Recent predictions</h2></div>
+          <div class="table-wrap"><table id="recent"><thead><tr><th>Time</th><th>ID</th><th>Triage</th><th>Top finding</th><th>Flagged</th><th>Latency</th><th>Feedback</th></tr></thead><tbody></tbody></table></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MODEL CARD -->
+    <section class="view" id="view-model">
+      <div class="section-head">
+        <div>
+          <h1>Model card</h1>
+          <p class="muted" id="mc-sub"></p>
+        </div>
+      </div>
+      <div class="kpis" id="mc-kpis"></div>
+      <div class="mon-grid">
+        <div class="card wide">
+          <div class="card-head"><h2>Test AUROC per finding</h2><span class="hint">patient-disjoint official NIH test split</span></div>
+          <div class="hbars auc" id="mc-auc"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>Intended use</h2></div>
+          <p id="mc-use"></p>
+          <h3>Known limitations</h3>
+          <ul class="bullets">
+            <li>Labels were mined from radiology reports with NLP and are noisy (~90% accurate).</li>
+            <li>Trained on a single US hospital; performance on Indian hospital data (different scanners, demographics) must be validated before any use.</li>
+            <li>Frontal views only; lateral views and paediatric images are out of distribution.</li>
+            <li>Heatmaps show where the model looked, not proof of pathology.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>Provenance</h2></div>
+          <dl class="kv" id="mc-prov"></dl>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <span>LungLens is a research prototype and is <b>not a medical device</b>. It must not be used for clinical decisions.</span>
+    <span class="muted" id="footer-version"></span>
+  </footer>
+
+  <div class="toast" id="toast" hidden></div>
+  <script src="app.js"></script>
+</body>
+</html>

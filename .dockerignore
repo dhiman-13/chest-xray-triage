@@ -1,0 +1,13 @@
+.git
+.venv
+venv
+data
+outputs
+reports
+models
+mlruns
+mlflow.db
+notebooks
+tests
+**/__pycache__
+*.ckpt

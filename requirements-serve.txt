@@ -1,0 +1,10 @@
+# Inference service only: no torch, the model runs on ONNX Runtime (small, fast image)
+fastapi>=0.111
+uvicorn[standard]>=0.30
+python-multipart>=0.0.9
+pydantic>=2.7
+numpy>=1.26
+opencv-python-headless>=4.9
+onnxruntime>=1.18
+prometheus-client>=0.20
+huggingface_hub>=0.23

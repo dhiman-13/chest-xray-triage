@@ -1,0 +1,37 @@
+defaults:
+  - model: densenet121
+  - data: nih
+  - _self_
+
+seed: 42
+
+paths:
+  output_dir: outputs          # on Colab point this at Google Drive so checkpoints survive disconnects
+
+train:
+  epochs: 12
+  batch_size: 64
+  lr: 3.0e-4
+  weight_decay: 1.0e-4
+  warmup_epochs: 1
+  loss: bce                    # bce | focal
+  focal_gamma: 2.0
+  use_pos_weight: true
+  pos_weight_cap: 10.0
+  precision: auto              # auto -> 16-mixed on GPU, 32 on CPU
+  accumulate_grad_batches: 1
+  early_stopping_patience: 3
+  limit_train_batches: 1.0     # set <1.0 for quick sanity runs
+  limit_val_batches: 1.0
+  num_workers: 2               # Colab has 2 vCPUs
+  resume_from: null            # path to last.ckpt to resume after a Colab disconnect
+
+mlflow:
+  tracking_uri: ${oc.env:MLFLOW_TRACKING_URI,sqlite:///mlflow.db}
+  artifact_location: null      # e.g. /content/drive/MyDrive/cxr-triage/mlartifacts
+  experiment: cxr-triage
+  run_name: ${model.name}-${now:%Y%m%d-%H%M}
+
+hydra:
+  run:
+    dir: ${paths.output_dir}/hydra/${now:%Y-%m-%d_%H-%M-%S}

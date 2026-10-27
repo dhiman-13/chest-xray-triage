@@ -1,0 +1,6 @@
+# run with: python -m cxr.train model=efficientnet_b3 train.batch_size=32
+name: efficientnet_b3
+backbone: efficientnet_b3
+pretrained: true
+drop_rate: 0.3
+img_size: 256

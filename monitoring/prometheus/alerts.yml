@@ -1,0 +1,39 @@
+groups:
+  - name: cxr-service
+    rules:
+      - alert: HighP95Latency
+        expr: histogram_quantile(0.95, sum by (le) (rate(cxr_http_request_duration_seconds_bucket{path="/api/predict"}[10m]))) > 1.5
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "p95 prediction latency above 1.5 s"
+
+      - alert: HighErrorRate
+        expr: sum(rate(cxr_http_requests_total{status=~"5.."}[10m])) / clamp_min(sum(rate(cxr_http_requests_total[10m])), 1e-9) > 0.05
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: "More than 5% of requests are failing"
+
+  - name: cxr-model
+    rules:
+      # Sudden change in how often studies are escalated usually means input drift or a bad model.
+      - alert: UrgentRateShift
+        expr: |
+          (sum(rate(cxr_predictions_total{triage="urgent"}[6h])) / clamp_min(sum(rate(cxr_predictions_total[6h])), 1e-9))
+          > 1.5 * (sum(rate(cxr_predictions_total{triage="urgent"}[7d])) / clamp_min(sum(rate(cxr_predictions_total[7d])), 1e-9))
+        for: 1h
+        labels: { severity: warning }
+        annotations:
+          summary: "Urgent triage rate 50% above its 7-day baseline"
+
+      - alert: InputBrightnessDrift
+        expr: |
+          abs(
+            sum(rate(cxr_input_mean_intensity_sum[6h])) / clamp_min(sum(rate(cxr_input_mean_intensity_count[6h])), 1e-9)
+            - sum(rate(cxr_input_mean_intensity_sum[7d])) / clamp_min(sum(rate(cxr_input_mean_intensity_count[7d])), 1e-9)
+          ) > 15
+        for: 1h
+        labels: { severity: warning }
+        annotations:
+          summary: "Mean input intensity shifted by >15 grey levels (new scanner/protocol?)"

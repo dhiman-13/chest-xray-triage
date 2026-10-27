@@ -1,0 +1,51 @@
+# Reproducible pipeline:  dvc repro   (re-runs only the stages whose inputs changed)
+# Data and models are tracked by content hash; push them to a remote with  dvc push.
+stages:
+  prepare:
+    cmd: python -m cxr.data.prepare_nih --source data/raw/data.zip --out data/processed
+    deps:
+      - data/raw/data.zip
+      - src/cxr/data/prepare_nih.py
+      - src/cxr/data/splits.py
+      - src/cxr/preprocess.py
+    outs:
+      - data/processed
+
+  train:
+    cmd: python -m cxr.train
+    deps:
+      - data/processed
+      - src/cxr/train.py
+      - src/cxr/models
+      - src/cxr/data/dataset.py
+      - configs
+    outs:
+      - outputs/checkpoints/densenet121/best.ckpt
+      - outputs/last_run.json:
+          cache: false
+
+  evaluate:
+    cmd: python -m cxr.evaluate --out reports
+    deps:
+      - outputs/checkpoints/densenet121/best.ckpt
+      - src/cxr/evaluate.py
+      - src/cxr/metrics.py
+    metrics:
+      - reports/metrics.json:
+          cache: false
+    plots:
+      - reports/figures/roc_curves.png
+      - reports/figures/reliability.png
+      - reports/figures/auroc_vs_baselines.png
+    outs:
+      - reports/calibration.json
+      - reports/test_predictions.csv
+
+  export:
+    cmd: python -m cxr.export --out models/bundle
+    deps:
+      - outputs/checkpoints/densenet121/best.ckpt
+      - reports/calibration.json
+      - src/cxr/export.py
+    outs:
+      - models/bundle

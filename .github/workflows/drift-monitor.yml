@@ -1,0 +1,43 @@
+name: Drift monitor
+
+# Daily: pull the production prediction log from the live API, compare it with the model's
+# reference data, and open a "retraining recommended" issue when drift is detected.
+on:
+  schedule:
+    - cron: "30 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  drift:
+    if: ${{ vars.HF_SPACE != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install pandas scipy numpy opencv-python-headless huggingface_hub
+      - name: Download reference data of the deployed model
+        run: python -c "from huggingface_hub import snapshot_download; snapshot_download('${{ vars.HF_MODEL_REPO }}', local_dir='bundle', allow_patterns=['*.csv','*.json'])"
+      - name: Run drift report
+        id: drift
+        continue-on-error: true
+        run: |
+          host=$(echo '${{ vars.HF_SPACE }}' | tr '/' '-' | tr '[:upper:]_' '[:lower:]-')
+          python monitoring/drift_report.py --bundle bundle \
+            --current "https://$host.hf.space/api/monitoring/export" \
+            --token "${{ secrets.MONITOR_TOKEN }}" --fail-on-drift
+      - uses: actions/upload-artifact@v4
+        with:
+          name: drift-report
+          path: reports/drift/
+      - name: Open retraining issue
+        if: steps.drift.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create --title "Data drift detected: retraining recommended ($(date -u +%F))" \
+            --body "$(printf 'The daily drift job flagged significant drift.\n\n```json\n%s\n```\n\nReport: %s' "$(cat reports/drift/summary.json)" "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}")"

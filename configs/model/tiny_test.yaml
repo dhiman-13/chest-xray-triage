@@ -1,0 +1,6 @@
+# Small randomly-initialised network for CI / smoke tests on CPU
+name: tiny_test
+backbone: resnet18
+pretrained: false
+drop_rate: 0.0
+img_size: 128

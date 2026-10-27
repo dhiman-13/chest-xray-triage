@@ -1,0 +1,6 @@
+# CheXNet backbone (Rajpurkar et al., 2017) - the reference baseline for ChestX-ray14
+name: densenet121
+backbone: densenet121
+pretrained: true
+drop_rate: 0.2
+img_size: 224
