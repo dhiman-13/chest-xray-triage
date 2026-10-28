@@ -1,0 +1,73 @@
+name: Deploy Space
+
+# Publishes the LungLens Space with the trained model baked in. The model bundle comes straight
+# from the Kaggle training run's output, so no separate model repo is needed.
+# Repo secrets: HF_TOKEN (Hugging Face, write), KAGGLE_API_TOKEN. Repo variables (optional):
+# HF_SPACE (default dhimanjatin/lunglens), KAGGLE_KERNEL (default jatin1313/lunglens-cxr-training-t4x2).
+on:
+  push:
+    branches: [lunglens-ui-deploy]
+    paths: [serving/**, src/cxr/labels.py, src/cxr/preprocess.py, requirements-serve.txt, deploy/**, .github/workflows/deploy-space.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-space
+  cancel-in-progress: true
+
+env:
+  HF_SPACE: ${{ vars.HF_SPACE || 'dhimanjatin/lunglens' }}
+  KAGGLE_KERNEL: ${{ vars.KAGGLE_KERNEL || 'jatin1313/lunglens-cxr-training-t4x2' }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install huggingface_hub kaggle
+
+      - name: Check credentials
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
+        run: |
+          [ -n "$HF_TOKEN" ] || { echo "::error::Repo secret HF_TOKEN is not set"; exit 1; }
+          [ -n "$KAGGLE_API_TOKEN" ] || { echo "::error::Repo secret KAGGLE_API_TOKEN is not set"; exit 1; }
+          python - <<'EOF'
+          import os
+          from huggingface_hub import HfApi
+          who = HfApi().whoami()
+          role = who.get("auth", {}).get("accessToken", {}).get("role")
+          owner = os.environ["HF_SPACE"].split("/")[0]
+          print(f"HF token belongs to {who['name']} (role: {role})")
+          if role == "read":
+              raise SystemExit("::error::HF_TOKEN is read-only; create a token with Write access")
+          if owner != who["name"] and owner not in {o["name"] for o in who.get("orgs", [])}:
+              raise SystemExit(f"::error::HF_TOKEN belongs to {who['name']}, which cannot write to {owner}")
+          EOF
+
+      - name: Download the trained model bundle from Kaggle
+        env:
+          KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
+        run: |
+          kaggle kernels output "$KAGGLE_KERNEL" -p kaggle-out --file-pattern "^cxr-triage/bundle/"
+          ls -l kaggle-out/cxr-triage/bundle
+          python -c "import hashlib,json; d='kaggle-out/cxr-triage/bundle'; ok=hashlib.sha256(open(f'{d}/model.onnx','rb').read()).hexdigest()==json.load(open(f'{d}/model_card.json'))['onnx_sha256']; print('model.onnx matches model card:', ok); raise SystemExit(0 if ok else 1)"
+
+      - name: Deploy to Hugging Face Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: python deploy/deploy_space.py --space "$HF_SPACE" --bundle kaggle-out/cxr-triage/bundle
+
+      - name: Wait for the live deployment to become healthy
+        run: |
+          url="https://$(echo "$HF_SPACE" | tr '/' '-' | tr '[:upper:]_' '[:lower:]-').hf.space/health"
+          for i in $(seq 1 45); do
+            if curl -fsS "$url"; then echo; echo "Live at ${url%/health}"; exit 0; fi
+            sleep 20
+          done
+          echo "::error::Space did not become healthy within 15 minutes" && exit 1
