@@ -45,7 +45,10 @@ def main() -> None:
     args = ap.parse_args()
 
     api = HfApi(token=os.environ.get("HF_TOKEN"))  # falls back to the cached `hf auth login` token
-    api.create_repo(args.space, repo_type="space", space_sdk="docker", exist_ok=True)
+    api.create_repo(args.space, repo_type="space", space_sdk="docker", private=False, exist_ok=True)
+    # A demo link must be shareable: accounts can default new repos to private, and
+    # exist_ok keeps an existing private Space private, so set visibility explicitly.
+    api.update_repo_settings(args.space, repo_type="space", private=False)
     if args.model_repo:
         api.add_space_variable(args.space, "HF_MODEL_REPO", args.model_repo)
     if os.environ.get("MONITOR_TOKEN"):
