@@ -1,0 +1,16 @@
+{
+  "id": "jatin1313/lunglens-cxr-training-t4x2",
+  "title": "LungLens CXR Training T4x2",
+  "code_file": "kaggle_train.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "docker_image": "gcr.io/kaggle-gpu-images/python",
+  "docker_image_pinning_type": "latest",
+  "dataset_sources": ["nih-chest-xrays/data"],
+  "competition_sources": [],
+  "kernel_sources": [],
+  "model_sources": []
+}

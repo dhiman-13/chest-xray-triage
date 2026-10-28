@@ -107,9 +107,10 @@ def main(cfg: DictConfig) -> float:
         "best_val_auroc_macro": best,
         "data_dir": cfg.data.dir,
     }
-    (out_dir / "last_run.json").write_text(json.dumps(run_info, indent=2))
-    logger.experiment.log_metric(logger.run_id, "best_val_auroc_macro", best)
-    print(json.dumps(run_info, indent=2))
+    if trainer.is_global_zero:  # DDP: only the main process records the run
+        (out_dir / "last_run.json").write_text(json.dumps(run_info, indent=2))
+        logger.experiment.log_metric(logger.run_id, "best_val_auroc_macro", best)
+        print(json.dumps(run_info, indent=2))
     return best
 
 
