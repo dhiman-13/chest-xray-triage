@@ -4,7 +4,7 @@
 # Free instances sleep after 15 minutes idle; the first request then takes about a minute.
 services:
   - type: web
-    name: lunglens
+    name: lunglens-xray  # becomes https://lunglens-xray.onrender.com ("lunglens" is taken by another app)
     runtime: docker
     plan: free
     repo: https://github.com/dhiman-13/chest-xray-triage
