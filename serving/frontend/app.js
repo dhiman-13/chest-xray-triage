@@ -39,18 +39,35 @@ function toast(msg) {
 }
 
 /* ---------------- navigation ---------------- */
+// "home" and "analyze" are the same page: home is its top, analyze its upload workspace
 function show(view) {
   $$(".tab").forEach((b) => {
     const on = b.dataset.view === view;
     b.classList.toggle("active", on);
     b.setAttribute("aria-selected", on);
   });
-  $$(".view").forEach((v) => v.classList.toggle("active", v.id === `view-${view}`));
+  const page = view === "home" ? "analyze" : view;
+  const wasActive = $(`#view-${page}`).classList.contains("active");
+  $$(".view").forEach((v) => v.classList.toggle("active", v.id === `view-${page}`));
   if (view === "monitor") loadMonitoring();
   if (view === "model") renderModelCard();
-  window.scrollTo({ top: 0 });
+  if (view === "analyze") $("#workspace").scrollIntoView({ behavior: wasActive ? "smooth" : "auto" });
+  else window.scrollTo({ top: 0, behavior: wasActive ? "smooth" : "auto" });
 }
 $$("[data-view]").forEach((el) => el.addEventListener("click", (e) => { e.preventDefault(); show(el.dataset.view); }));
+
+/* ---------------- theme ---------------- */
+function setTheme(theme) {
+  const light = theme === "light";
+  if (light) document.documentElement.dataset.theme = "light";
+  else delete document.documentElement.dataset.theme;
+  $("#theme-btn").setAttribute("aria-label", `Switch to ${light ? "dark" : "light"} theme`);
+  document.querySelector('meta[name="theme-color"]').content = light ? "#f4f7fb" : "#050a13";
+  try { localStorage.setItem("lunglens-theme", theme); } catch (_) { /* private mode: theme just isn't remembered */ }
+  if ($("#view-monitor").classList.contains("active")) loadMonitoring(); // chart colours come from CSS vars
+}
+$("#theme-btn").addEventListener("click", () => setTheme(document.documentElement.dataset.theme === "light" ? "dark" : "light"));
+setTheme(document.documentElement.dataset.theme === "light" ? "light" : "dark");
 
 /* ---------------- health ---------------- */
 async function checkHealth() {
@@ -95,8 +112,8 @@ async function analyzeSample(s) {
 
 /* ---------------- hero ---------------- */
 const toWorkspace = () => $("#workspace").scrollIntoView({ behavior: "smooth" });
-$("#cta-upload").addEventListener("click", () => { toWorkspace(); input.click(); });
-$("#cta-sample").addEventListener("click", () => { toWorkspace(); $("#sample-grid .sample")?.focus({ preventScroll: true }); });
+// open the file picker straight from the hero; analyze() scrolls to the results once a file is chosen
+$("#cta-upload").addEventListener("click", () => input.click());
 
 /* ---------------- demo ----------------
    Replays the deployed model's real outputs (precomputed in samples/demo.json) on NIH test
@@ -209,7 +226,8 @@ async function analyze(file, sample = null) {
   stage.classList.add("loading");
   $("#heat-caption").textContent = "";
   await drawImageFromFile(file);
-  if (window.matchMedia("(max-width: 980px)").matches) $("#viewer").scrollIntoView({ behavior: "smooth", block: "start" });
+  const mobile = window.matchMedia("(max-width: 980px)").matches;
+  (mobile ? $("#viewer") : $("#workspace")).scrollIntoView({ behavior: "smooth", block: "start" });
 
   const form = new FormData();
   form.append("file", file);
