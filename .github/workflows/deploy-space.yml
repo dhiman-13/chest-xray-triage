@@ -4,6 +4,7 @@ name: Deploy Space
 # from the Kaggle training run's output, so no separate model repo is needed.
 # Repo secrets: HF_TOKEN (Hugging Face, write), KAGGLE_API_TOKEN. Repo variables (optional):
 # HF_SPACE (default dhimanjatin/lunglens), KAGGLE_KERNEL (default jatin1313/lunglens-cxr-training-t4x2).
+# Re-deploy by hand from the Actions tab: "Deploy Space" -> "Run workflow".
 on:
   push:
     branches: [lunglens-ui-deploy]
