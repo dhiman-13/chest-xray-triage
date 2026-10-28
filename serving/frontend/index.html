@@ -5,17 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>LungLens · Chest X-ray Triage</title>
   <meta name="description" content="AI-assisted chest X-ray triage with explainable heatmaps. Research prototype trained on NIH ChestX-ray14.">
-  <meta name="theme-color" content="#f6f5f1" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#0e1113" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#050a13">
   <meta property="og:title" content="LungLens · Chest X-ray Triage">
   <meta property="og:description" content="Upload a chest X-ray and see 14 findings scored, triaged and explained with heatmaps.">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%230f5f5a'/%3E%3Cpath d='M16 7v8m0 0c-1.6 0-2.6 1.8-4.4 1.8C9 16.8 7 19.6 7 23c0 1.8.9 2.8 2.6 2.8 3.6 0 6.4-2.8 6.4-6.4m0-4.4c1.6 0 2.6 1.8 4.4 1.8 2.6 0 4.6 2.8 4.6 6.2 0 1.8-.9 2.8-2.6 2.8-3.6 0-6.4-2.8-6.4-6.4' stroke='white' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%233b82f6'/%3E%3Cpath d='M16 7v8m0 0c-1.6 0-2.6 1.8-4.4 1.8C9 16.8 7 19.6 7 23c0 1.8.9 2.8 2.6 2.8 3.6 0 6.4-2.8 6.4-6.4m0-4.4c1.6 0 2.6 1.8 4.4 1.8 2.6 0 4.6 2.8 4.6 6.2 0 1.8-.9 2.8-2.6 2.8-3.6 0-6.4-2.8-6.4-6.4' stroke='white' stroke-width='1.9' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <div class="glow" aria-hidden="true"></div>
+
   <header class="topbar">
     <a class="brand" href="#" data-view="analyze" aria-label="LungLens home">
       <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9"/><path d="M16 7v8m0 0c-1.6 0-2.6 1.8-4.4 1.8C9 16.8 7 19.6 7 23c0 1.8.9 2.8 2.6 2.8 3.6 0 6.4-2.8 6.4-6.4m0-4.4c1.6 0 2.6 1.8 4.4 1.8 2.6 0 4.6 2.8 4.6 6.2 0 1.8-.9 2.8-2.6 2.8-3.6 0-6.4-2.8-6.4-6.4"/></svg>
@@ -31,11 +32,58 @@
 
   <main>
     <!-- ANALYZE -->
-    <section class="view active" id="view-analyze" aria-labelledby="hero-title">
+    <section class="view active" id="view-analyze">
       <div class="hero">
-        <p class="eyebrow">Research prototype · DenseNet-121 · NIH ChestX-ray14</p>
-        <h1 id="hero-title">Chest X-ray triage, <em>with its reasoning shown.</em></h1>
-        <p class="lede">Upload a frontal chest radiograph. LungLens scores 14 findings, suggests where the study belongs in the worklist, and shows where it looked for each finding.</p>
+        <div class="hero-copy">
+          <p class="eyebrow"><span class="pulse"></span>Research prototype · DenseNet-121 · NIH ChestX-ray14</p>
+          <h1>Chest X-ray triage in seconds, <span class="grad">with the reasoning shown.</span></h1>
+          <p class="lede">LungLens scores 14 thoracic findings on a frontal chest radiograph, decides whether the study is urgent, and highlights exactly where it looked.</p>
+          <div class="cta">
+            <button class="btn primary lg" id="cta-upload" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0L7 9m5-5 5 5M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>Analyze an X-ray
+            </button>
+            <button class="btn outline lg" id="cta-sample" type="button">Try a sample</button>
+          </div>
+          <dl class="stats">
+            <div><dt>Test AUROC</dt><dd id="stat-auroc">0.804</dd></div>
+            <div><dt>Findings</dt><dd>14</dd></div>
+            <div><dt>Per study</dt><dd>~0.3 s</dd></div>
+            <div><dt>Test images</dt><dd id="stat-ntest">25,596</dd></div>
+          </dl>
+        </div>
+
+        <!-- animated model demo: real outputs of the deployed model on NIH test images -->
+        <figure class="demo" id="demo" aria-label="Animated demo of the model analysing chest X-rays">
+          <figcaption class="demo-head">
+            <span class="live"><i></i>Model demo</span>
+            <span class="demo-src" id="demo-src">NIH test set · unseen in training</span>
+          </figcaption>
+          <div class="demo-body">
+            <div class="demo-stage">
+              <img id="demo-img" alt="" width="512" height="512">
+              <canvas id="demo-heat" width="192" height="192"></canvas>
+              <div class="demo-scan"></div>
+              <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+              <div class="demo-tag" id="demo-tag"></div>
+            </div>
+            <div class="demo-panel">
+              <ol class="demo-steps" id="demo-steps">
+                <li data-step="0">Scan</li><li data-step="1">Localize</li><li data-step="2">Score</li><li data-step="3">Triage</li>
+              </ol>
+              <ul class="demo-findings" id="demo-findings"></ul>
+              <div class="demo-verdict" id="demo-verdict"></div>
+            </div>
+          </div>
+          <div class="demo-foot">
+            <div class="demo-dots" id="demo-dots" role="tablist" aria-label="Demo samples"></div>
+            <button class="link-btn" id="demo-try" type="button">Analyze this X-ray →</button>
+          </div>
+        </figure>
+      </div>
+
+      <div class="workspace-head" id="workspace">
+        <h2>Analyze an X-ray</h2>
+        <p class="muted">Drop your own radiograph, or pick one of the test images below.</p>
       </div>
 
       <div class="analyze-grid">
@@ -69,8 +117,8 @@
 
           <div class="samples" id="samples">
             <div class="samples-head">
-              <h2>No X-ray at hand? Try one from the test set</h2>
-              <span class="hint">Never seen in training · labels by NIH radiology reports</span>
+              <h3>Test-set samples</h3>
+              <span class="hint">Never seen in training · labels from NIH radiology reports</span>
             </div>
             <div class="sample-grid" id="sample-grid"></div>
           </div>
@@ -104,7 +152,7 @@
 
           <div class="card" id="feedback-card" hidden>
             <div class="card-head"><h2>Does this match your read?</h2></div>
-            <p class="muted">Feedback is stored with the prediction and becomes labelled data for the next retraining cycle.</p>
+            <p class="muted small">Feedback is stored with the prediction and becomes labelled data for the next retraining cycle.</p>
             <div class="fb-buttons">
               <button class="btn outline" data-verdict="agree" type="button">Agree</button>
               <button class="btn outline" data-verdict="disagree" type="button">Disagree</button>

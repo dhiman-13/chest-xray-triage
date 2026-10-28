@@ -60,7 +60,12 @@ async function checkHealth() {
     el.className = `status ${h.status === "ok" ? "ok" : ""}`;
     $("#status-text").textContent = h.status === "ok" ? "Model online" : "Model loading";
     $("#footer-version").textContent = h.model_version ? `Model ${h.model_version}` : "";
-    if (!state.card && h.status === "ok") state.card = await api("/api/model");
+    if (!state.card && h.status === "ok") {
+      state.card = await api("/api/model");
+      const m = state.card.metrics || {};
+      if (m.auroc_macro != null) $("#stat-auroc").textContent = m.auroc_macro.toFixed(3);
+      if (m.n_test != null) $("#stat-ntest").textContent = m.n_test.toLocaleString();
+    }
   } catch (_) {
     el.className = "status err";
     $("#status-text").textContent = "API unreachable";
@@ -76,15 +81,103 @@ async function loadSamples() {
         <img src="samples/${esc(s.file)}" alt="Chest X-ray, ${esc(s.label)}" loading="lazy" width="512" height="512">
         <span>${esc(LABEL(s.label))}</span>
       </button>`).join("");
-    $$(".sample").forEach((b) => b.addEventListener("click", async () => {
-      const s = samples[b.dataset.i];
-      $$(".sample").forEach((x) => x.classList.toggle("active", x === b));
-      const blob = await (await fetch(`samples/${s.file}`)).blob();
-      analyze(new File([blob], s.file, { type: "image/jpeg" }), s);
-    }));
+    $$(".sample").forEach((b) => b.addEventListener("click", () => analyzeSample(samples[b.dataset.i])));
   } catch (_) {
     $("#samples").hidden = true;
   }
+}
+
+async function analyzeSample(s) {
+  $$(".sample").forEach((x) => x.querySelector("img").getAttribute("src").endsWith(s.file) ? x.classList.add("active") : x.classList.remove("active"));
+  const blob = await (await fetch(`samples/${s.file}`)).blob();
+  analyze(new File([blob], s.file, { type: "image/jpeg" }), s);
+}
+
+/* ---------------- hero ---------------- */
+const toWorkspace = () => $("#workspace").scrollIntoView({ behavior: "smooth" });
+$("#cta-upload").addEventListener("click", () => { toWorkspace(); input.click(); });
+$("#cta-sample").addEventListener("click", () => { toWorkspace(); $("#sample-grid .sample")?.focus({ preventScroll: true }); });
+
+/* ---------------- demo ----------------
+   Replays the deployed model's real outputs (precomputed in samples/demo.json) on NIH test
+   images: scan -> localize (heatmap) -> score -> triage. Pauses on hover and when off-screen. */
+const demo = { items: [], i: 0, timers: [], visible: true, hover: false };
+const DEMO_MS = 7000;
+
+async function loadDemo() {
+  try {
+    const d = await (await fetch("samples/demo.json")).json();
+    // the clearest teaching cases first: reported finding detected and ranked on top
+    demo.items = d.samples.filter((s) => s.label !== "No Finding")
+      .sort((a, b) => (b.findings[0].label === b.label) - (a.findings[0].label === a.label));
+    demo.items.forEach((s) => { const im = new Image(); im.src = `samples/${s.file}`; });
+    $("#demo-dots").innerHTML = demo.items.map((s, i) =>
+      `<button type="button" role="tab" aria-label="${esc(LABEL(s.label))}" data-i="${i}"></button>`).join("");
+    $$("#demo-dots button").forEach((b) => b.addEventListener("click", () => playDemo(+b.dataset.i)));
+    $("#demo-try").addEventListener("click", () => { toWorkspace(); analyzeSample(demo.items[demo.i]); });
+    const el = $("#demo");
+    el.addEventListener("mouseenter", () => { demo.hover = true; el.classList.add("paused"); });
+    el.addEventListener("mouseleave", () => { demo.hover = false; el.classList.remove("paused"); });
+    new IntersectionObserver(([e]) => { demo.visible = e.isIntersecting; }).observe(el);
+    playDemo(0);
+  } catch (_) {
+    $("#demo").hidden = true;
+  }
+}
+
+function demoAt(ms, fn) { demo.timers.push(setTimeout(fn, ms)); }
+
+function playDemo(i) {
+  demo.timers.forEach(clearTimeout);
+  demo.timers = [];
+  demo.i = i;
+  const s = demo.items[i];
+  const el = $("#demo");
+  const steps = $$("#demo-steps li");
+  const setStep = (k) => steps.forEach((li, j) => { li.classList.toggle("on", j === k); li.classList.toggle("done", j < k); });
+
+  el.className = "demo";
+  if (demo.hover) el.classList.add("paused");
+  setStep(-1);
+  $$("#demo-dots button").forEach((b, j) => {
+    b.classList.remove("on");
+    if (j === i) { void b.offsetWidth; b.classList.add("on"); b.style.setProperty("--dur", `${DEMO_MS}ms`); }
+  });
+  $("#demo-src").textContent = `NIH test image · ${s.view} view · ${s.age}${s.sex}`;
+  const img = $("#demo-img");
+  img.src = `samples/${s.file}`;
+  img.alt = `Chest X-ray reported as ${LABEL(s.label)}`;
+  renderHeat(s.heatmap, $("#demo-heat"));
+  const focus = s.findings.find((f) => f.label === s.focus);
+  $("#demo-tag").textContent = `Looking at: ${LABEL(s.focus)}`;
+  $("#demo-findings").innerHTML = s.findings.map((f) => `
+    <li class="${f.positive ? "pos" : ""} ${f.urgent ? "urgent" : ""} ${f.label === s.focus ? "focus" : ""}">
+      <span class="n">${LABEL(f.label)}</span><span class="v">${pct(f.probability)}</span>
+      <span class="b"><i data-w="${(f.probability * 100).toFixed(1)}"></i></span>
+    </li>`).join("");
+  const detected = focus ? focus.positive : s.findings.some((f) => f.label === s.label && f.positive);
+  $("#demo-verdict").innerHTML = `
+    <span class="verdict-chip ${s.triage}">${ICONS[s.triage]}${s.triage}</span>
+    <p class="verdict-truth">Radiologist report: <b>${esc(LABEL(s.label))}</b> ·
+      ${detected ? '<span class="ok">detected</span>' : "not flagged"} · ${s.flagged} of 14 flagged</p>`;
+
+  demoAt(50, () => { el.classList.add("s-in", "s-scan"); setStep(0); });
+  demoAt(1600, () => { el.classList.add("s-loc"); setStep(1); });
+  // absolute times, and each step also completes the earlier ones, so throttled timers
+  // (background tabs, slow phones) can never leave the demo half drawn
+  const showBars = (n) => $$("#demo-findings li").forEach((li, k) => {
+    if (k >= n) return;
+    li.classList.add("show");
+    const bar = li.querySelector(".b i");
+    bar.style.width = `${bar.dataset.w}%`;
+  });
+  demoAt(2400, () => { el.classList.add("s-in", "s-loc"); setStep(2); });
+  s.findings.forEach((_, k) => demoAt(2400 + k * 180, () => showBars(k + 1)));
+  demoAt(3700, () => { el.classList.add("s-in", "s-loc", "s-tri"); showBars(Infinity); setStep(3); });
+  demoAt(DEMO_MS, function next() {
+    if (demo.hover || !demo.visible || document.hidden) return demoAt(500, next);
+    playDemo((demo.i + 1) % demo.items.length);
+  });
 }
 
 /* ---------------- upload ---------------- */
@@ -174,12 +267,19 @@ function turbo(t) {
 }
 
 const heatCache = new Map();
-function heatCanvas(label, size = 192) {
-  if (heatCache.has(label)) return heatCache.get(label);
-  const grid = state.result.heatmaps[label];
+function heatCanvas(label) {
+  if (!heatCache.has(label)) {
+    const c = document.createElement("canvas");
+    c.width = c.height = 192;
+    renderHeat(state.result.heatmaps[label], c);
+    heatCache.set(label, c);
+  }
+  return heatCache.get(label);
+}
+
+function renderHeat(grid, c) {
+  const size = c.width;
   const h = grid.length, w = grid[0].length;
-  const c = document.createElement("canvas");
-  c.width = c.height = size;
   const ctx = c.getContext("2d");
   const img = ctx.createImageData(size, size);
   for (let y = 0; y < size; y++) {
@@ -197,8 +297,6 @@ function heatCanvas(label, size = 192) {
     }
   }
   ctx.putImageData(img, 0, 0);
-  heatCache.set(label, c);
-  return c;
 }
 
 function drawStage() {
@@ -429,5 +527,6 @@ async function renderModelCard() {
 
 /* ---------------- boot ---------------- */
 loadSamples();
+loadDemo();
 checkHealth();
 setInterval(checkHealth, 30000);
