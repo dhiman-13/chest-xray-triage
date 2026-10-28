@@ -59,8 +59,12 @@ class CXRClassifier(L.LightningModule):
     def on_validation_epoch_end(self):
         if not self._val_logits:
             return
-        p = torch.sigmoid(torch.cat(self._val_logits)).numpy()
-        y = torch.cat(self._val_targets).numpy()
+        logits, targets = torch.cat(self._val_logits), torch.cat(self._val_targets)
+        if self.trainer.world_size > 1:  # DDP: gather every GPU's share of the validation set
+            logits = self.all_gather(logits.to(self.device)).flatten(0, 1).cpu()
+            targets = self.all_gather(targets.to(self.device)).flatten(0, 1).cpu()
+        p = torch.sigmoid(logits).numpy()
+        y = targets.numpy()
         self._val_logits.clear()
         self._val_targets.clear()
         auc = per_class_auroc(y, p)
