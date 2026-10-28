@@ -45,6 +45,7 @@ jobs:
           role = who.get("auth", {}).get("accessToken", {}).get("role")
           owner = os.environ["HF_SPACE"].split("/")[0]
           print(f"HF token belongs to {who['name']} (role: {role})")
+          print(f"::notice title=HF token::belongs to {who['name']}, role {role}")
           if role == "read":
               raise SystemExit("::error::HF_TOKEN is read-only; create a token with Write access")
           if owner != who["name"] and owner not in {o["name"] for o in who.get("orgs", [])}:
@@ -62,7 +63,10 @@ jobs:
       - name: Deploy to Hugging Face Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: python deploy/deploy_space.py --space "$HF_SPACE" --bundle kaggle-out/cxr-triage/bundle
+        # Surface the failure reason as an annotation: those are visible without signing in.
+        run: |
+          python deploy/deploy_space.py --space "$HF_SPACE" --bundle kaggle-out/cxr-triage/bundle 2> >(tee deploy.err >&2) || {
+            echo "::error title=Deploy failed::$(tail -n 6 deploy.err | tr '\n' ' ' | cut -c1-900)"; exit 1; }
 
       - name: Wait for the live deployment to become healthy
         run: |
