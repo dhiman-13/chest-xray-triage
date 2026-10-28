@@ -1,0 +1,20 @@
+# Render Blueprint: the LungLens app (FastAPI + ONNX Runtime + frontend) on Render's free plan.
+# Render builds serving/Dockerfile from this repo; on boot the container downloads the model
+# bundle from the public Hugging Face model repo (see .github/workflows/publish-model.yml).
+# Free instances sleep after 15 minutes idle; the first request then takes about a minute.
+services:
+  - type: web
+    name: lunglens
+    runtime: docker
+    plan: free
+    repo: https://github.com/dhiman-13/chest-xray-triage
+    branch: lunglens-ui-deploy
+    dockerfilePath: ./serving/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: HF_MODEL_REPO
+        value: dhimanjatin/lunglens-model
+      - key: ORT_THREADS
+        value: "1"
