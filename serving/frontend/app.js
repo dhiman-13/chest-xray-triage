@@ -1,16 +1,23 @@
 "use strict";
 
 const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => document.querySelectorAll(sel);
 const LABEL = (l) => l.replace(/_/g, " ");
 const pct = (p) => `${(p * 100).toFixed(1)}%`;
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
+const ICONS = {
+  urgent: '<svg viewBox="0 0 24 24"><path d="M12 8v5M12 16.5v.01"/><path d="M10.3 3.9 2.6 17.5A2 2 0 0 0 4.3 20.5h15.4a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>',
+  review: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.4-4.4"/></svg>',
+  routine: '<svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>',
+};
 const TRIAGE_COPY = {
-  urgent: { icon: "!", title: "Prioritise for immediate read", text: "One or more time-critical findings exceed their operating threshold." },
-  review: { icon: "?", title: "Abnormal: routine radiologist review", text: "Non-urgent findings detected above threshold." },
-  routine: { icon: "✓", title: "No finding above threshold", text: "Study can stay in the routine worklist. A radiologist still reads every image." },
+  urgent: { title: "Prioritise for an immediate read", text: "A time-critical finding is above its operating point." },
+  review: { title: "Abnormal, routine review", text: "Non-urgent findings are above their operating points." },
+  routine: { title: "Nothing above threshold", text: "Can stay in the routine worklist. A radiologist still reads every study." },
 };
 
-const state = { result: null, selected: null, image: null, card: null, verdict: null, corrected: new Set() };
+const state = { result: null, selected: null, image: null, card: null, verdict: null, corrected: new Set(), overlay: true, sample: null };
 
 /* ---------------- API ---------------- */
 async function api(path, opts = {}) {
@@ -28,31 +35,55 @@ function toast(msg) {
   t.textContent = msg;
   t.hidden = false;
   clearTimeout(toast._t);
-  toast._t = setTimeout(() => (t.hidden = true), 3500);
+  toast._t = setTimeout(() => (t.hidden = true), 3800);
 }
 
-/* ---------------- tabs ---------------- */
-document.querySelectorAll(".tab").forEach((btn) =>
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b === btn));
-    document.querySelectorAll(".view").forEach((v) => v.classList.toggle("active", v.id === `view-${btn.dataset.view}`));
-    if (btn.dataset.view === "monitor") loadMonitoring();
-    if (btn.dataset.view === "model") renderModelCard();
-  })
-);
+/* ---------------- navigation ---------------- */
+function show(view) {
+  $$(".tab").forEach((b) => {
+    const on = b.dataset.view === view;
+    b.classList.toggle("active", on);
+    b.setAttribute("aria-selected", on);
+  });
+  $$(".view").forEach((v) => v.classList.toggle("active", v.id === `view-${view}`));
+  if (view === "monitor") loadMonitoring();
+  if (view === "model") renderModelCard();
+  window.scrollTo({ top: 0 });
+}
+$$("[data-view]").forEach((el) => el.addEventListener("click", (e) => { e.preventDefault(); show(el.dataset.view); }));
 
 /* ---------------- health ---------------- */
 async function checkHealth() {
   const el = $("#status");
   try {
     const h = await api("/health");
-    el.className = "status ok";
-    $("#status-text").textContent = `Model ${h.model_version} online`;
-    $("#footer-version").textContent = `model ${h.model_version}`;
-    if (!state.card) state.card = await api("/api/model");
-  } catch (e) {
+    el.className = `status ${h.status === "ok" ? "ok" : ""}`;
+    $("#status-text").textContent = h.status === "ok" ? "Model online" : "Model loading";
+    $("#footer-version").textContent = h.model_version ? `Model ${h.model_version}` : "";
+    if (!state.card && h.status === "ok") state.card = await api("/api/model");
+  } catch (_) {
     el.className = "status err";
     $("#status-text").textContent = "API unreachable";
+  }
+}
+
+/* ---------------- samples ---------------- */
+async function loadSamples() {
+  try {
+    const samples = await (await fetch("samples/samples.json")).json();
+    $("#sample-grid").innerHTML = samples.map((s, i) => `
+      <button class="sample" type="button" data-i="${i}" title="${esc(s.label)} · ${esc(s.view)} view · ${s.age}${esc(s.sex)}">
+        <img src="samples/${esc(s.file)}" alt="Chest X-ray, ${esc(s.label)}" loading="lazy" width="512" height="512">
+        <span>${esc(LABEL(s.label))}</span>
+      </button>`).join("");
+    $$(".sample").forEach((b) => b.addEventListener("click", async () => {
+      const s = samples[b.dataset.i];
+      $$(".sample").forEach((x) => x.classList.toggle("active", x === b));
+      const blob = await (await fetch(`samples/${s.file}`)).blob();
+      analyze(new File([blob], s.file, { type: "image/jpeg" }), s);
+    }));
+  } catch (_) {
+    $("#samples").hidden = true;
   }
 }
 
@@ -66,32 +97,41 @@ input.addEventListener("change", () => input.files[0] && analyze(input.files[0])
 $("#reset-btn").addEventListener("click", reset);
 
 function reset() {
-  state.result = null;
+  state.result = state.sample = null;
   input.value = "";
   $("#stage").hidden = true;
   $("#viewer-tools").hidden = true;
   dz.hidden = false;
-  $("#findings-card").hidden = true;
-  $("#feedback-card").hidden = true;
-  $("#triage-card").innerHTML = document.querySelector("#triage-card").dataset.placeholder;
+  $("#intro-card").hidden = false;
+  ["#triage-card", "#findings-card", "#feedback-card"].forEach((s) => ($(s).hidden = true));
+  $$(".sample").forEach((x) => x.classList.remove("active"));
 }
 
-async function analyze(file) {
+async function analyze(file, sample = null) {
   if (!/image\/(png|jpeg)/.test(file.type)) return toast("Please upload a PNG or JPEG image");
+  state.sample = sample;
   dz.hidden = true;
   const stage = $("#stage");
   stage.hidden = false;
   stage.classList.add("loading");
   $("#heat-caption").textContent = "";
-  drawImageFromFile(file);
+  await drawImageFromFile(file);
+  if (window.matchMedia("(max-width: 980px)").matches) $("#viewer").scrollIntoView({ behavior: "smooth", block: "start" });
 
   const form = new FormData();
   form.append("file", file);
   try {
-    const result = await api("/api/predict", { method: "POST", body: form });
+    const [result] = await Promise.all([
+      api("/api/predict", { method: "POST", body: form }),
+      new Promise((r) => setTimeout(r, 700)), // let the scan animation read as deliberate
+    ]);
+    // The API ranks by probability / threshold, which over-promotes classes with tiny thresholds
+    // (e.g. Hernia). Readers expect the most likely findings first: flagged ones, by probability.
+    result.findings.sort((a, b) => (b.positive - a.positive) || (b.probability - a.probability));
     state.result = result;
     state.image = await loadImage(result.image);
-    state.selected = result.findings[0].label;
+    const reported = sample && result.findings.find((f) => f.label === sample.label);
+    state.selected = (reported || result.findings[0]).label;
     renderResult();
   } catch (e) {
     toast(`Analysis failed: ${e.message}`);
@@ -112,13 +152,16 @@ function loadImage(src) {
 
 async function drawImageFromFile(file) {
   const url = URL.createObjectURL(file);
-  const img = await loadImage(url);
-  const c = $("#canvas"), ctx = c.getContext("2d");
-  ctx.fillStyle = "#000";
-  ctx.fillRect(0, 0, c.width, c.height);
-  const s = Math.min(c.width / img.width, c.height / img.height);
-  ctx.drawImage(img, (c.width - img.width * s) / 2, (c.height - img.height * s) / 2, img.width * s, img.height * s);
-  URL.revokeObjectURL(url);
+  try {
+    const img = await loadImage(url);
+    const c = $("#canvas"), ctx = c.getContext("2d");
+    ctx.fillStyle = "#050607";
+    ctx.fillRect(0, 0, c.width, c.height);
+    const s = Math.min(c.width / img.width, c.height / img.height);
+    ctx.drawImage(img, (c.width - img.width * s) / 2, (c.height - img.height * s) / 2, img.width * s, img.height * s);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
 
 /* ---------------- heatmap ---------------- */
@@ -130,7 +173,10 @@ function turbo(t) {
   return [r, g, b].map((v) => Math.round(255 * Math.min(1, Math.max(0, v))));
 }
 
-function heatCanvas(grid, size = 160) {
+const heatCache = new Map();
+function heatCanvas(label, size = 192) {
+  if (heatCache.has(label)) return heatCache.get(label);
+  const grid = state.result.heatmaps[label];
   const h = grid.length, w = grid[0].length;
   const c = document.createElement("canvas");
   c.width = c.height = size;
@@ -151,6 +197,7 @@ function heatCanvas(grid, size = 160) {
     }
   }
   ctx.putImageData(img, 0, 0);
+  heatCache.set(label, c);
   return c;
 }
 
@@ -161,38 +208,60 @@ function drawStage() {
   ctx.imageSmoothingQuality = "high";
   ctx.globalAlpha = 1;
   ctx.drawImage(state.image, 0, 0, c.width, c.height);
-  const show = $("#heat-toggle").checked;
+  $("#stage").classList.toggle("no-overlay", !state.overlay);
   const f = state.result.findings.find((x) => x.label === state.selected);
-  if (show && state.selected) {
+  if (state.overlay && f) {
     ctx.globalAlpha = $("#heat-opacity").value / 100;
-    ctx.drawImage(heatCanvas(state.result.heatmaps[state.selected]), 0, 0, c.width, c.height);
+    ctx.drawImage(heatCanvas(f.label), 0, 0, c.width, c.height);
     ctx.globalAlpha = 1;
-    $("#heat-caption").textContent = `Attention for ${LABEL(state.selected)} · ${pct(f.probability)}`;
+    $("#heat-caption").textContent = `${LABEL(f.label)} · ${pct(f.probability)}`;
   } else {
     $("#heat-caption").textContent = "";
   }
 }
-$("#heat-toggle").addEventListener("change", drawStage);
 $("#heat-opacity").addEventListener("input", drawStage);
+$$(".seg").forEach((b) => b.addEventListener("click", () => {
+  state.overlay = b.dataset.overlay === "on";
+  $$(".seg").forEach((x) => x.classList.toggle("active", x === b));
+  drawStage();
+}));
 
 /* ---------------- results ---------------- */
 function renderResult() {
   const r = state.result;
+  heatCache.clear();
   const copy = TRIAGE_COPY[r.triage];
-  const flagged = r.findings.filter((f) => f.positive).map((f) => LABEL(f.label));
-  $("#triage-card").innerHTML = `
+  const flagged = r.findings.filter((f) => f.positive);
+  const urgent = flagged.filter((f) => f.urgent).map((f) => LABEL(f.label));
+  const sub = r.triage === "urgent" ? `Above operating point: ${urgent.join(", ")}.`
+    : r.triage === "review" ? `Above operating point: ${flagged.map((f) => LABEL(f.label)).join(", ")}.`
+    : copy.text;
+
+  let truth = "";
+  if (state.sample) {
+    const label = state.sample.label;
+    const match = r.findings.find((f) => f.label === label);
+    const hit = label === "No Finding" ? r.triage === "routine" : Boolean(match?.positive);
+    const verdict = label === "No Finding" ? (hit ? "Correctly routine" : "Over-flagged") : (hit ? "Detected" : "Missed");
+    truth = `<div class="truth">Report label <b>${esc(LABEL(label))}</b> · ${esc(state.sample.view)} view, ${state.sample.age}${esc(state.sample.sex)}
+      <span class="match ${hit ? "hit" : "miss"}">${verdict}</span></div>`;
+  }
+
+  const card = $("#triage-card");
+  card.innerHTML = `
     <div class="triage ${r.triage}">
-      <div class="triage-badge">${copy.icon}</div>
+      <div class="triage-badge">${ICONS[r.triage]}</div>
       <div>
         <div class="triage-level">${r.triage}</div>
         <div class="triage-title">${copy.title}</div>
-        <div class="muted small">${flagged.length ? "Flagged: " + flagged.join(", ") : copy.text}</div>
+        <div class="triage-sub">${esc(sub)}</div>
       </div>
     </div>
+    ${truth}
     <div class="triage-meta">
-      <span>Latency <b>${r.latency_ms} ms</b></span>
-      <span>Model <b>${r.model_version}</b></span>
-      <span>Study ID <b>${r.prediction_id}</b></span>
+      <span>Flagged <b>${flagged.length}/14</b></span>
+      <span>Latency <b>${Math.round(r.latency_ms)} ms</b></span>
+      <span>Study <b>${esc(r.prediction_id)}</b></span>
     </div>`;
 
   const list = $("#findings");
@@ -200,23 +269,30 @@ function renderResult() {
   r.findings.forEach((f) => {
     const li = document.createElement("li");
     li.className = `finding${f.positive ? " positive" : ""}${f.urgent ? " is-urgent" : ""}${f.label === state.selected ? " selected" : ""}`;
+    li.tabIndex = 0;
+    li.setAttribute("role", "button");
     li.innerHTML = `
       <div class="f-name"><span>${LABEL(f.label)}</span>
+        ${f.urgent ? '<i class="urgent-dot" title="Time-critical finding"></i>' : ""}
         ${f.positive ? `<span class="tag ${f.urgent ? "urgent" : "flag"}">${f.urgent ? "urgent" : "flagged"}</span>` : ""}
       </div>
       <div class="f-pct">${pct(f.probability)}</div>
-      <div class="f-bar"><div class="f-fill" style="width:0"></div><div class="f-th" style="left:${Math.min(f.threshold, 1) * 100}%"></div></div>`;
-    li.addEventListener("click", () => {
+      <div class="f-bar"><div class="f-fill"></div><div class="f-th" style="left:${Math.min(f.threshold, 1) * 100}%" title="Operating point ${pct(f.threshold)}"></div></div>`;
+    const select = () => {
       state.selected = f.label;
       list.querySelectorAll(".finding").forEach((n) => n.classList.remove("selected"));
       li.classList.add("selected");
-      drawStage();
-    });
+      if (!state.overlay) $$(".seg")[0].click();
+      else drawStage();
+    };
+    li.addEventListener("click", select);
+    li.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(); } });
     list.appendChild(li);
-    requestAnimationFrame(() => (li.querySelector(".f-fill").style.width = `${f.probability * 100}%`));
+    requestAnimationFrame(() => requestAnimationFrame(() => (li.querySelector(".f-fill").style.width = `${f.probability * 100}%`)));
   });
 
-  $("#findings-card").hidden = false;
+  $("#intro-card").hidden = true;
+  [card, $("#findings-card")].forEach((el) => (el.hidden = false));
   $("#viewer-tools").hidden = false;
   renderFeedback();
   drawStage();
@@ -229,7 +305,8 @@ function renderFeedback() {
   $("#feedback-card").hidden = false;
   $("#fb-form").hidden = true;
   $("#fb-done").hidden = true;
-  document.querySelectorAll(".fb-buttons .btn").forEach((b) => b.classList.remove("selected"));
+  $("#fb-comment").value = "";
+  $$(".fb-buttons .btn").forEach((b) => b.classList.remove("selected"));
   const chips = $("#fb-labels");
   chips.innerHTML = "";
   state.result.findings.map((f) => f.label).sort().forEach((label) => {
@@ -245,12 +322,13 @@ function renderFeedback() {
   });
 }
 
-document.querySelectorAll(".fb-buttons .btn").forEach((btn) =>
+$$(".fb-buttons .btn").forEach((btn) =>
   btn.addEventListener("click", async () => {
-    document.querySelectorAll(".fb-buttons .btn").forEach((b) => b.classList.toggle("selected", b === btn));
+    $$(".fb-buttons .btn").forEach((b) => b.classList.toggle("selected", b === btn));
     state.verdict = btn.dataset.verdict;
     if (state.verdict === "disagree") {
       $("#fb-form").hidden = false;
+      $("#fb-done").hidden = true;
     } else {
       $("#fb-form").hidden = true;
       await sendFeedback();
@@ -282,43 +360,41 @@ async function sendFeedback() {
 const kpi = (label, value, sub = "") =>
   `<div class="kpi"><div class="kpi-label">${label}</div><div class="kpi-value">${value}</div><div class="kpi-sub">${sub}</div></div>`;
 const hbar = (label, value, max, text, color) =>
-  `<div class="hbar"><span>${label}</span><div class="hbar-track"><div class="hbar-fill" style="width:${max ? (value / max) * 100 : 0}%;${color ? `background:${color}` : ""}"></div></div><span class="num">${text}</span></div>`;
+  `<div class="hbar"><span title="${label}">${label}</span><div class="hbar-track"><div class="hbar-fill" style="width:${max ? (value / max) * 100 : 0}%;${color ? `background:${color}` : ""}"></div></div><span class="num">${text}</span></div>`;
+const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
 async function loadMonitoring() {
   try {
     const [s, recent] = await Promise.all([api("/api/stats"), api("/api/predictions?limit=25")]);
     const t = s.total || 0;
-    const urgentRate = t ? s.by_triage.urgent / t : 0;
     const fbTotal = s.feedback.agree + s.feedback.disagree;
     $("#kpis").innerHTML =
-      kpi("Studies (24h)", t, "processed by the model") +
-      kpi("Urgent rate", pct(urgentRate), `${s.by_triage.urgent} studies prioritised`) +
-      kpi("Avg latency", `${s.avg_latency_ms} ms`, "end-to-end, incl. preprocessing") +
-      kpi("Radiologist agreement", s.agreement_rate == null ? "–" : pct(s.agreement_rate), `${fbTotal} feedback entries`);
+      kpi("Studies, last 24 h", t.toLocaleString(), "processed by the model") +
+      kpi("Urgent rate", t ? pct(s.by_triage.urgent / t) : "–", `${s.by_triage.urgent} studies prioritised`) +
+      kpi("Average latency", t ? `${Math.round(s.avg_latency_ms)} ms` : "–", "server side, including preprocessing") +
+      kpi("Reader agreement", s.agreement_rate == null ? "–" : pct(s.agreement_rate), `${fbTotal} feedback ${fbTotal === 1 ? "entry" : "entries"}`);
 
     const maxH = Math.max(1, ...s.per_hour);
-    $("#hours").innerHTML = s.per_hour.map((n, i) => `<div title="${n} studies, hour ${i + 1}" style="height:${(n / maxH) * 100}%"></div>`).join("");
+    $("#hours").innerHTML = s.per_hour.map((n, i) => `<div title="${n} studies" style="height:${(n / maxH) * 100}%"></div>`).join("");
 
-    const css = getComputedStyle(document.documentElement);
-    const colors = { urgent: css.getPropertyValue("--urgent"), review: css.getPropertyValue("--review"), routine: css.getPropertyValue("--routine") };
+    const colors = { urgent: cssVar("--urgent"), review: cssVar("--review"), routine: cssVar("--routine") };
     $("#triage-mix").innerHTML =
       `<div class="stack">${Object.entries(s.by_triage).map(([k, v]) => `<div style="width:${t ? (v / t) * 100 : 0}%;background:${colors[k]}"></div>`).join("")}</div>` +
-      Object.entries(s.by_triage).map(([k, v]) => `<div class="mix-row"><span><i style="background:${colors[k]}"></i>${k}</span><b>${v}</b></div>`).join("");
+      Object.entries(s.by_triage).map(([k, v]) => `<div class="mix-row"><span><i style="background:${colors[k]}"></i>${k}</span><span><b>${v}</b><em>${t ? pct(v / t) : ""}</em></span></div>`).join("");
 
-    const flags = Object.entries(s.flagged_counts).sort((a, b) => b[1] - a[1]).slice(0, 8);
+    const flags = Object.entries(s.flagged_counts).sort((a, b) => b[1] - a[1]).slice(0, 7);
     const maxF = Math.max(1, ...flags.map((f) => f[1]));
     $("#flag-bars").innerHTML = flags.some((f) => f[1]) ? flags.map(([l, n]) => hbar(LABEL(l), n, maxF, n)).join("") : `<div class="empty">No flagged findings yet</div>`;
 
-    const tbody = $("#recent tbody");
-    tbody.innerHTML = recent.length
+    $("#recent tbody").innerHTML = recent.length
       ? recent.map((p) => `<tr>
-          <td>${new Date(p.ts * 1000).toLocaleTimeString()}</td>
-          <td class="mono">${p.id}</td>
+          <td>${new Date(p.ts * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</td>
+          <td class="mono">${esc(p.id)}</td>
           <td><span class="pill ${p.triage}">${p.triage}</span></td>
           <td>${LABEL(p.top_finding)}</td>
-          <td>${p.flagged.map(LABEL).join(", ") || "–"}</td>
-          <td class="mono">${p.latency_ms.toFixed(0)} ms</td>
-          <td>${p.verdict ? (p.verdict === "agree" ? "✓ agree" : "✕ disagree") : "–"}</td></tr>`).join("")
+          <td class="flagged">${p.flagged.map(LABEL).join(", ") || "–"}</td>
+          <td class="mono r">${p.latency_ms.toFixed(0)} ms</td>
+          <td>${p.verdict ? (p.verdict === "agree" ? "Agree" : "Disagree") : "–"}</td></tr>`).join("")
       : `<tr><td colspan="7" class="empty">No predictions yet. Analyze an image first.</td></tr>`;
   } catch (e) {
     toast(`Could not load monitoring data: ${e.message}`);
@@ -331,26 +407,27 @@ async function renderModelCard() {
   try {
     const c = state.card || (state.card = await api("/api/model"));
     const m = c.metrics || {};
-    const ci = m.auroc_macro_ci ? `95% CI ${m.auroc_macro_ci[0].toFixed(3)}–${m.auroc_macro_ci[1].toFixed(3)}` : "";
-    $("#mc-sub").textContent = `${c.name} v${c.version} · ${c.backbone} · ${c.img_size}px input · trained on ${c.training_data}`;
+    const ci = m.auroc_macro_ci ? `95% CI ${m.auroc_macro_ci[0].toFixed(3)} – ${m.auroc_macro_ci[1].toFixed(3)}` : "";
+    $("#mc-title").textContent = `${c.backbone === "densenet121" ? "DenseNet-121" : c.backbone}, version ${c.version}`;
+    $("#mc-sub").textContent = `${c.img_size} px input · 14 findings · trained on ${c.training_data}.`;
     $("#mc-kpis").innerHTML =
       kpi("Macro AUROC", m.auroc_macro != null ? m.auroc_macro.toFixed(3) : "–", ci) +
       kpi("Urgent-findings AUROC", m.auroc_urgent_macro != null ? m.auroc_urgent_macro.toFixed(3) : "–", "6 time-critical findings") +
-      kpi("Calibration error (ECE)", m.ece_calibrated != null ? m.ece_calibrated.toFixed(3) : "–", m.ece_uncalibrated != null ? `${m.ece_uncalibrated.toFixed(3)} before temperature scaling` : "") +
-      kpi("Test images", m.n_test != null ? m.n_test.toLocaleString() : "–", `target sensitivity ${c.target_sensitivity ? pct(c.target_sensitivity) : "–"}`);
+      kpi("Calibration error", m.ece_calibrated != null ? m.ece_calibrated.toFixed(3) : "–", m.ece_uncalibrated != null ? `ECE, down from ${m.ece_uncalibrated.toFixed(3)}` : "") +
+      kpi("Test images", m.n_test != null ? m.n_test.toLocaleString() : "–", `operating points at ${c.target_sensitivity ? pct(c.target_sensitivity) : "–"} sensitivity`);
     const auc = Object.entries(c.per_class_auroc || {}).filter(([, v]) => v != null).sort((a, b) => b[1] - a[1]);
     $("#mc-auc").innerHTML = auc.length
       ? auc.map(([l, v]) => hbar(LABEL(l), Math.max(0, v - 0.5), 0.5, v.toFixed(3))).join("")
       : `<div class="empty">No evaluation metrics in this bundle</div>`;
     $("#mc-use").textContent = c.intended_use;
-    const prov = { Version: c.version, Backbone: c.backbone, Temperature: c.temperature?.toFixed(3), "MLflow run": c.mlflow_run_id || "–", Created: c.created_at, "ONNX SHA-256": c.onnx_sha256?.slice(0, 16) + "…" };
-    $("#mc-prov").innerHTML = Object.entries(prov).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+    const prov = { Version: c.version, Backbone: c.backbone, Temperature: c.temperature?.toFixed(3), "MLflow run": c.mlflow_run_id || "–", Created: c.created_at, "ONNX SHA-256": c.onnx_sha256 ? `${c.onnx_sha256.slice(0, 16)}…` : "–" };
+    $("#mc-prov").innerHTML = Object.entries(prov).map(([k, v]) => `<dt>${k}</dt><dd>${esc(v ?? "–")}</dd>`).join("");
   } catch (e) {
     toast(`Could not load model card: ${e.message}`);
   }
 }
 
 /* ---------------- boot ---------------- */
-$("#triage-card").dataset.placeholder = $("#triage-card").innerHTML;
+loadSamples();
 checkHealth();
 setInterval(checkHealth, 30000);

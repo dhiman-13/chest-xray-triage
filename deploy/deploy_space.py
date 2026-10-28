@@ -1,10 +1,12 @@
 """Deploy the serving app to a Hugging Face Docker Space.
 
     HF_TOKEN=... python deploy/deploy_space.py --space <user>/lunglens --model-repo <user>/cxr-triage-model
+    HF_TOKEN=... python deploy/deploy_space.py --space <user>/lunglens --bundle models/bundle
 
 The Space gets only what the container needs (Dockerfile at its root, as Spaces require).
-The model is not copied: the container downloads the bundle from the model repo on boot,
-so shipping a new model = publishing a new bundle + restarting the Space.
+With --model-repo the model is not copied: the container downloads the bundle from the model
+repo on boot, so shipping a new model = publishing a new bundle + restarting the Space.
+With --bundle the bundle is baked into the image instead: one self-contained Space.
 """
 
 from __future__ import annotations
@@ -37,12 +39,15 @@ AI-assisted chest X-ray triage with explainable heatmaps. Research prototype, no
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--space", required=True)
-    ap.add_argument("--model-repo", required=True)
+    source = ap.add_mutually_exclusive_group(required=True)
+    source.add_argument("--model-repo", help="HF model repo the container downloads the bundle from")
+    source.add_argument("--bundle", type=Path, help="local bundle directory to bake into the image")
     args = ap.parse_args()
 
-    api = HfApi(token=os.environ["HF_TOKEN"])
+    api = HfApi(token=os.environ.get("HF_TOKEN"))  # falls back to the cached `hf auth login` token
     api.create_repo(args.space, repo_type="space", space_sdk="docker", exist_ok=True)
-    api.add_space_variable(args.space, "HF_MODEL_REPO", args.model_repo)
+    if args.model_repo:
+        api.add_space_variable(args.space, "HF_MODEL_REPO", args.model_repo)
     if os.environ.get("MONITOR_TOKEN"):
         api.add_space_secret(args.space, "MONITOR_TOKEN", os.environ["MONITOR_TOKEN"])
 
@@ -55,6 +60,10 @@ def main() -> None:
             shutil.copy(ROOT / "src/cxr" / f, t / "src/cxr" / f)
         shutil.copytree(ROOT / "serving", t / "serving",
                         ignore=shutil.ignore_patterns("__pycache__", "*.db", "*.onnx", "*.csv", "model_card.json", "Dockerfile"))  # fmt: skip
+        if args.bundle:
+            for f in ("model.onnx", "model_card.json", "reference_images.csv", "reference_predictions.csv"):
+                if (args.bundle / f).exists():
+                    shutil.copy(args.bundle / f, t / "serving/model_store" / f)
         (t / "README.md").write_text(SPACE_README, encoding="utf-8")
         api.upload_folder(folder_path=str(t), repo_id=args.space, repo_type="space",
                           commit_message="Deploy LungLens", delete_patterns=["*"])  # fmt: skip

@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/dhiman-13/chest-xray-triage/actions/workflows/ci.yml/badge.svg)](https://github.com/dhiman-13/chest-xray-triage/actions/workflows/ci.yml)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/dhiman-13/chest-xray-triage/blob/main/notebooks/colab_train.ipynb)
-[![Live demo](https://img.shields.io/badge/🤗%20Live%20demo-LungLens-0d9488)](https://huggingface.co/spaces/YOUR-HF-USERNAME/lunglens)
+[![Live demo](https://img.shields.io/badge/🤗%20Live%20demo-LungLens-0d9488)](https://huggingface.co/spaces/dhimanjatin/lunglens)
 
 A deep-learning system that reads a frontal chest radiograph, scores **14 thoracic findings**, explains each prediction with a **heatmap**, and sorts studies into **urgent / review / routine** so a radiologist's worklist reads the critical cases first. It is built and run like a production ML service: versioned data, tracked experiments, a model registry with a quality gate, CI/CD, a containerised API with a web frontend, and live monitoring with drift detection.
 

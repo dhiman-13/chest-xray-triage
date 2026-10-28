@@ -4,97 +4,118 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>LungLens · Chest X-ray Triage</title>
-  <meta name="description" content="AI-assisted chest X-ray triage with explainable heatmaps. Research demo.">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230ea5a4'/%3E%3Cpath d='M16 6v9M16 15c-2 0-3 2-5 2-3 0-5 3-5 7 0 2 1 3 3 3 4 0 7-3 7-7m0-5c2 0 3 2 5 2 3 0 5 3 5 7 0 2-1 3-3 3-4 0-7-3-7-7' stroke='white' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+  <meta name="description" content="AI-assisted chest X-ray triage with explainable heatmaps. Research prototype trained on NIH ChestX-ray14.">
+  <meta name="theme-color" content="#f6f5f1" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0e1113" media="(prefers-color-scheme: dark)">
+  <meta property="og:title" content="LungLens · Chest X-ray Triage">
+  <meta property="og:description" content="Upload a chest X-ray and see 14 findings scored, triaged and explained with heatmaps.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%230f5f5a'/%3E%3Cpath d='M16 7v8m0 0c-1.6 0-2.6 1.8-4.4 1.8C9 16.8 7 19.6 7 23c0 1.8.9 2.8 2.6 2.8 3.6 0 6.4-2.8 6.4-6.4m0-4.4c1.6 0 2.6 1.8 4.4 1.8 2.6 0 4.6 2.8 4.6 6.2 0 1.8-.9 2.8-2.6 2.8-3.6 0-6.4-2.8-6.4-6.4' stroke='white' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <header class="topbar">
-    <div class="brand">
-      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9"/><path d="M16 6v9M16 15c-2 0-3 2-5 2-3 0-5 3-5 7 0 2 1 3 3 3 4 0 7-3 7-7m0-5c2 0 3 2 5 2 3 0 5 3 5 7 0 2-1 3-3 3-4 0-7-3-7-7"/></svg>
-      <div>
-        <div class="brand-name">LungLens</div>
-        <div class="brand-sub">Chest X-ray triage</div>
-      </div>
-    </div>
-    <nav class="tabs" role="tablist">
-      <button class="tab active" data-view="analyze" role="tab">Analyze</button>
-      <button class="tab" data-view="monitor" role="tab">Monitoring</button>
-      <button class="tab" data-view="model" role="tab">Model card</button>
+    <a class="brand" href="#" data-view="analyze" aria-label="LungLens home">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9"/><path d="M16 7v8m0 0c-1.6 0-2.6 1.8-4.4 1.8C9 16.8 7 19.6 7 23c0 1.8.9 2.8 2.6 2.8 3.6 0 6.4-2.8 6.4-6.4m0-4.4c1.6 0 2.6 1.8 4.4 1.8 2.6 0 4.6 2.8 4.6 6.2 0 1.8-.9 2.8-2.6 2.8-3.6 0-6.4-2.8-6.4-6.4"/></svg>
+      <span class="brand-name">LungLens</span>
+    </a>
+    <nav class="tabs" role="tablist" aria-label="Sections">
+      <button class="tab active" data-view="analyze" role="tab" aria-selected="true">Analyze</button>
+      <button class="tab" data-view="monitor" role="tab" aria-selected="false">Monitoring</button>
+      <button class="tab" data-view="model" role="tab" aria-selected="false">Model</button>
     </nav>
-    <div class="status" id="status"><span class="dot"></span><span id="status-text">Connecting…</span></div>
+    <div class="status" id="status" title="API status"><span class="dot"></span><span id="status-text">Connecting</span></div>
   </header>
 
   <main>
     <!-- ANALYZE -->
-    <section class="view active" id="view-analyze">
+    <section class="view active" id="view-analyze" aria-labelledby="hero-title">
+      <div class="hero">
+        <p class="eyebrow">Research prototype · DenseNet-121 · NIH ChestX-ray14</p>
+        <h1 id="hero-title">Chest X-ray triage, <em>with its reasoning shown.</em></h1>
+        <p class="lede">Upload a frontal chest radiograph. LungLens scores 14 findings, suggests where the study belongs in the worklist, and shows where it looked for each finding.</p>
+      </div>
+
       <div class="analyze-grid">
-        <div class="card viewer-card">
-          <div class="card-head">
-            <h2>Radiograph</h2>
-            <div class="viewer-tools" id="viewer-tools" hidden>
-              <label class="switch"><input type="checkbox" id="heat-toggle" checked><span></span>Heatmap</label>
-              <label class="slider-label">Opacity <input type="range" id="heat-opacity" min="0" max="100" value="55"></label>
-              <button class="btn ghost small" id="reset-btn">New image</button>
+        <div class="viewer-col">
+          <div class="viewer" id="viewer">
+            <label class="dropzone" id="dropzone">
+              <input type="file" id="file-input" accept="image/png,image/jpeg">
+              <span class="dz-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 16V4m0 0L7 9m5-5 5 5M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg></span>
+              <span class="dz-title">Drop a chest X-ray here</span>
+              <span class="dz-sub">or <u>browse your files</u> · PNG or JPEG, frontal PA/AP, up to 15 MB</span>
+            </label>
+
+            <div class="stage" id="stage" hidden>
+              <canvas id="canvas" width="768" height="768" aria-label="Radiograph with attention heatmap"></canvas>
+              <div class="scan" id="scan" aria-live="polite"><div class="scan-line"></div><span>Reading the image</span></div>
+              <div class="stage-caption" id="heat-caption"></div>
+              <div class="legend" id="legend"><span>Low</span><i></i><span>High attention</span></div>
             </div>
           </div>
 
-          <label class="dropzone" id="dropzone">
-            <input type="file" id="file-input" accept="image/png,image/jpeg" hidden>
-            <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 31V13m0 0-7 7m7-7 7 7M10 33v4a3 3 0 0 0 3 3h22a3 3 0 0 0 3-3v-4"/></svg>
-            <div class="dz-title">Drop a chest X-ray here</div>
-            <div class="dz-sub">Frontal PA/AP view · PNG or JPEG · up to 15 MB</div>
-            <span class="btn primary">Choose file</span>
-            <div class="dz-note">Images are processed in memory and never stored.</div>
-          </label>
+          <div class="viewer-tools" id="viewer-tools" hidden>
+            <div class="segmented" role="group" aria-label="Overlay">
+              <button class="seg active" data-overlay="on" type="button">Heatmap</button>
+              <button class="seg" data-overlay="off" type="button">Original</button>
+            </div>
+            <label class="range">Opacity <input type="range" id="heat-opacity" min="10" max="100" value="60"></label>
+            <button class="btn ghost" id="reset-btn" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>New study
+            </button>
+          </div>
 
-          <div class="stage" id="stage" hidden>
-            <canvas id="canvas" width="512" height="512"></canvas>
-            <div class="scan" id="scan"><div class="scan-line"></div><span>Analyzing…</span></div>
-            <div class="heat-caption" id="heat-caption"></div>
-            <div class="legend"><span>low</span><i></i><span>high attention</span></div>
+          <div class="samples" id="samples">
+            <div class="samples-head">
+              <h2>No X-ray at hand? Try one from the test set</h2>
+              <span class="hint">Never seen in training · labels by NIH radiology reports</span>
+            </div>
+            <div class="sample-grid" id="sample-grid"></div>
           </div>
         </div>
 
-        <div class="results-col">
-          <div class="card triage-card" id="triage-card">
-            <div class="placeholder">
-              <div class="ph-icon">◎</div>
-              <p>Upload a radiograph to get a triage recommendation, per-finding probabilities and an explanation heatmap.</p>
-              <ul class="steps">
-                <li><b>1</b> Upload image</li>
-                <li><b>2</b> Model scores 14 findings</li>
-                <li><b>3</b> Review heatmaps &amp; give feedback</li>
-              </ul>
-            </div>
+        <div class="results-col" aria-live="polite">
+          <div class="card intro-card" id="intro-card">
+            <ol class="how">
+              <li><span>1</span><div><b>Upload</b><p>A frontal chest radiograph, or pick a sample.</p></div></li>
+              <li><span>2</span><div><b>Score</b><p>14 thoracic findings, each with a calibrated probability.</p></div></li>
+              <li><span>3</span><div><b>Triage</b><p>Urgent, review or routine, against per-finding operating points.</p></div></li>
+              <li><span>4</span><div><b>Explain</b><p>A heatmap for every finding shows where the model looked.</p></div></li>
+            </ol>
+            <p class="fineprint">Images are processed in memory and are not stored. Only scores and timing are logged for monitoring.</p>
           </div>
+
+          <div class="card triage-card" id="triage-card" hidden></div>
 
           <div class="card" id="findings-card" hidden>
             <div class="card-head">
               <h2>Findings</h2>
-              <span class="hint">Click a finding to see where the model looked</span>
+              <span class="hint">Select one to see its heatmap</span>
             </div>
             <ul class="findings" id="findings"></ul>
-            <div class="threshold-key"><i></i> operating threshold (set for 90% sensitivity on validation data)</div>
+            <div class="key">
+              <span><i class="k-bar"></i>probability</span>
+              <span><i class="k-tick"></i>operating point (90% sensitivity)</span>
+              <span><i class="k-urgent"></i>time-critical finding</span>
+            </div>
           </div>
 
           <div class="card" id="feedback-card" hidden>
-            <div class="card-head"><h2>Radiologist feedback</h2></div>
-            <p class="muted">Feedback is logged with the prediction and becomes labelled data for the next retraining cycle.</p>
+            <div class="card-head"><h2>Does this match your read?</h2></div>
+            <p class="muted">Feedback is stored with the prediction and becomes labelled data for the next retraining cycle.</p>
             <div class="fb-buttons">
-              <button class="btn ok" data-verdict="agree">✓ Agree</button>
-              <button class="btn bad" data-verdict="disagree">✕ Disagree</button>
+              <button class="btn outline" data-verdict="agree" type="button">Agree</button>
+              <button class="btn outline" data-verdict="disagree" type="button">Disagree</button>
             </div>
             <form id="fb-form" hidden>
-              <div class="muted small">Which findings are actually present?</div>
+              <p class="muted small">Which findings are actually present?</p>
               <div class="chips" id="fb-labels"></div>
               <textarea id="fb-comment" rows="2" placeholder="Optional comment"></textarea>
               <button class="btn primary" type="submit">Submit feedback</button>
             </form>
-            <div class="fb-done" id="fb-done" hidden>Thanks, feedback recorded.</div>
+            <p class="fb-done" id="fb-done" hidden>Thank you. Your feedback has been recorded.</p>
           </div>
         </div>
       </div>
@@ -104,23 +125,24 @@
     <section class="view" id="view-monitor">
       <div class="section-head">
         <div>
-          <h1>Production monitoring</h1>
-          <p class="muted">Live statistics from the prediction log (last 24 hours). Full time-series dashboards run in Grafana.</p>
+          <p class="eyebrow">Operations</p>
+          <h1>Monitoring</h1>
+          <p class="lede">Live statistics from the prediction log over the last 24 hours.</p>
         </div>
         <div class="head-links">
-          <a class="btn ghost small" href="/metrics" target="_blank">Prometheus /metrics</a>
-          <a class="btn ghost small" href="/docs" target="_blank">API docs</a>
-          <button class="btn ghost small" id="refresh-btn">Refresh</button>
+          <a class="btn ghost" href="/docs" target="_blank" rel="noopener">API docs</a>
+          <a class="btn ghost" href="/metrics" target="_blank" rel="noopener">Prometheus</a>
+          <button class="btn outline" id="refresh-btn" type="button">Refresh</button>
         </div>
       </div>
       <div class="kpis" id="kpis"></div>
       <div class="mon-grid">
-        <div class="card"><div class="card-head"><h2>Studies per hour</h2></div><div class="hours" id="hours"></div></div>
+        <div class="card"><div class="card-head"><h2>Studies per hour</h2></div><div class="hours" id="hours"></div><div class="axis"><span>24 h ago</span><span>now</span></div></div>
         <div class="card"><div class="card-head"><h2>Triage mix</h2></div><div id="triage-mix"></div></div>
-        <div class="card"><div class="card-head"><h2>Flagged findings</h2></div><div class="hbars" id="flag-bars"></div></div>
+        <div class="card"><div class="card-head"><h2>Most flagged findings</h2></div><div class="hbars" id="flag-bars"></div></div>
         <div class="card wide">
           <div class="card-head"><h2>Recent predictions</h2></div>
-          <div class="table-wrap"><table id="recent"><thead><tr><th>Time</th><th>ID</th><th>Triage</th><th>Top finding</th><th>Flagged</th><th>Latency</th><th>Feedback</th></tr></thead><tbody></tbody></table></div>
+          <div class="table-wrap"><table id="recent"><thead><tr><th>Time</th><th>Study</th><th>Triage</th><th>Top finding</th><th>Flagged</th><th class="r">Latency</th><th>Feedback</th></tr></thead><tbody></tbody></table></div>
         </div>
       </div>
     </section>
@@ -129,14 +151,15 @@
     <section class="view" id="view-model">
       <div class="section-head">
         <div>
-          <h1>Model card</h1>
-          <p class="muted" id="mc-sub"></p>
+          <p class="eyebrow">Model card</p>
+          <h1 id="mc-title">The model</h1>
+          <p class="lede" id="mc-sub"></p>
         </div>
       </div>
       <div class="kpis" id="mc-kpis"></div>
       <div class="mon-grid">
         <div class="card wide">
-          <div class="card-head"><h2>Test AUROC per finding</h2><span class="hint">patient-disjoint official NIH test split</span></div>
+          <div class="card-head"><h2>Test AUROC per finding</h2><span class="hint">Patient-disjoint official NIH test split · 0.5 = chance, 1.0 = perfect</span></div>
           <div class="hbars auc" id="mc-auc"></div>
         </div>
         <div class="card">
@@ -144,9 +167,10 @@
           <p id="mc-use"></p>
           <h3>Known limitations</h3>
           <ul class="bullets">
-            <li>Labels were mined from radiology reports with NLP and are noisy (~90% accurate).</li>
-            <li>Trained on a single US hospital; performance on Indian hospital data (different scanners, demographics) must be validated before any use.</li>
-            <li>Frontal views only; lateral views and paediatric images are out of distribution.</li>
+            <li>Labels were mined from radiology reports with NLP and are noisy (about 90% accurate).</li>
+            <li>Trained on data from a single US hospital. Performance on other populations and scanners must be validated before any use.</li>
+            <li>Frontal views only. Lateral views and paediatric images are out of distribution.</li>
+            <li>Operating points favour sensitivity, so most studies are flagged for review.</li>
             <li>Heatmaps show where the model looked, not proof of pathology.</li>
           </ul>
         </div>
@@ -159,11 +183,11 @@
   </main>
 
   <footer>
-    <span>LungLens is a research prototype and is <b>not a medical device</b>. It must not be used for clinical decisions.</span>
-    <span class="muted" id="footer-version"></span>
+    <p><b>Not a medical device.</b> LungLens is a research prototype and must not be used for clinical decisions.</p>
+    <p class="muted" id="footer-version"></p>
   </footer>
 
-  <div class="toast" id="toast" hidden></div>
+  <div class="toast" id="toast" role="status" hidden></div>
   <script src="app.js"></script>
 </body>
 </html>

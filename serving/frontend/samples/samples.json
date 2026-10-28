@@ -1,0 +1,50 @@
+[
+  {
+    "file": "00000032_000.jpg",
+    "id": "00000032_000",
+    "label": "Cardiomegaly",
+    "view": "AP",
+    "age": 55,
+    "sex": "F"
+  },
+  {
+    "file": "00000618_001.jpg",
+    "id": "00000618_001",
+    "label": "Mass",
+    "view": "PA",
+    "age": 53,
+    "sex": "F"
+  },
+  {
+    "file": "00000246_005.jpg",
+    "id": "00000246_005",
+    "label": "Emphysema",
+    "view": "AP",
+    "age": 51,
+    "sex": "M"
+  },
+  {
+    "file": "00000003_000.jpg",
+    "id": "00000003_000",
+    "label": "Hernia",
+    "view": "PA",
+    "age": 81,
+    "sex": "F"
+  },
+  {
+    "file": "00000116_012.jpg",
+    "id": "00000116_012",
+    "label": "Pneumothorax",
+    "view": "AP",
+    "age": 75,
+    "sex": "F"
+  },
+  {
+    "file": "00000092_000.jpg",
+    "id": "00000092_000",
+    "label": "No Finding",
+    "view": "PA",
+    "age": 54,
+    "sex": "F"
+  }
+]

@@ -1,6 +1,6 @@
 # Inference image: FastAPI + ONNX Runtime + static frontend. No torch -> ~350 MB instead of ~2 GB.
 # Build from the repo root:  docker build -f serving/Dockerfile -t cxr-triage .
-FROM python:3.11-slim
+FROM python:3.11-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
