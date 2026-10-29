@@ -1,7 +1,7 @@
 """Deploy the serving app to a Hugging Face Docker Space.
 
-    HF_TOKEN=... python deploy/deploy_space.py --space <user>/lunglens --model-repo <user>/cxr-triage-model
-    HF_TOKEN=... python deploy/deploy_space.py --space <user>/lunglens --bundle models/bundle
+    HF_TOKEN=... python deploy/deploy_space.py --space <user>/radiassist --model-repo <user>/cxr-triage-model
+    HF_TOKEN=... python deploy/deploy_space.py --space <user>/radiassist --bundle models/bundle
 
 The Space gets only what the container needs (Dockerfile at its root, as Spaces require).
 With --model-repo the model is not copied: the container downloads the bundle from the model
@@ -22,7 +22,7 @@ from huggingface_hub import HfApi
 ROOT = Path(__file__).resolve().parents[1]
 
 SPACE_README = """---
-title: LungLens - Chest X-ray Triage
+title: RadiAssist - Chest X-ray Triage
 emoji: 🫁
 colorFrom: green
 colorTo: blue
@@ -69,7 +69,7 @@ def main() -> None:
                     shutil.copy(args.bundle / f, t / "serving/model_store" / f)
         (t / "README.md").write_text(SPACE_README, encoding="utf-8")
         api.upload_folder(folder_path=str(t), repo_id=args.space, repo_type="space",
-                          commit_message="Deploy LungLens", delete_patterns=["*"])  # fmt: skip
+                          commit_message="Deploy RadiAssist", delete_patterns=["*"])  # fmt: skip
     print(f"Deployed to https://huggingface.co/spaces/{args.space}")
 
 

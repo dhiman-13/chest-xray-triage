@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>LungLens · Chest X-ray Triage</title>
+  <title>RadiAssist · Chest X-ray Triage</title>
   <meta name="description" content="AI-assisted chest X-ray triage with explainable heatmaps. Research prototype trained on NIH ChestX-ray14.">
   <meta name="theme-color" content="#050a13">
-  <meta property="og:title" content="LungLens · Chest X-ray Triage">
+  <meta property="og:title" content="RadiAssist · Chest X-ray Triage">
   <meta property="og:description" content="Upload a chest X-ray and see 14 findings scored, triaged and explained with heatmaps.">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%233b82f6'/%3E%3Cpath d='M16 7v8m0 0c-1.6 0-2.6 1.8-4.4 1.8C9 16.8 7 19.6 7 23c0 1.8.9 2.8 2.6 2.8 3.6 0 6.4-2.8 6.4-6.4m0-4.4c1.6 0 2.6 1.8 4.4 1.8 2.6 0 4.6 2.8 4.6 6.2 0 1.8-.9 2.8-2.6 2.8-3.6 0-6.4-2.8-6.4-6.4' stroke='white' stroke-width='1.9' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -14,16 +14,16 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
   <script>/* apply the saved theme before first paint, so there is no flash */
-    try { if (localStorage.getItem("lunglens-theme") === "light") document.documentElement.dataset.theme = "light"; } catch (_) {}
+    try { if (localStorage.getItem("radiassist-theme") === "light") document.documentElement.dataset.theme = "light"; } catch (_) {}
   </script>
 </head>
 <body>
   <div class="glow" aria-hidden="true"></div>
 
   <header class="topbar">
-    <a class="brand" href="#" data-view="home" aria-label="LungLens home">
+    <a class="brand" href="#" data-view="home" aria-label="RadiAssist home">
       <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9"/><path d="M16 7v8m0 0c-1.6 0-2.6 1.8-4.4 1.8C9 16.8 7 19.6 7 23c0 1.8.9 2.8 2.6 2.8 3.6 0 6.4-2.8 6.4-6.4m0-4.4c1.6 0 2.6 1.8 4.4 1.8 2.6 0 4.6 2.8 4.6 6.2 0 1.8-.9 2.8-2.6 2.8-3.6 0-6.4-2.8-6.4-6.4"/></svg>
-      <span class="brand-name">LungLens</span>
+      <span class="brand-name">RadiAssist</span>
     </a>
     <nav class="tabs" role="tablist" aria-label="Sections">
       <button class="tab active" data-view="home" role="tab" aria-selected="true">Home</button>
@@ -47,7 +47,7 @@
         <div class="hero-copy">
           <p class="eyebrow"><span class="pulse"></span>Research prototype · DenseNet-121 · NIH ChestX-ray14</p>
           <h1>Chest X-ray triage in seconds, <span class="grad">with the reasoning shown.</span></h1>
-          <p class="lede">LungLens scores 14 thoracic findings on a frontal chest radiograph, decides whether the study is urgent, and highlights exactly where it looked.</p>
+          <p class="lede">RadiAssist scores 14 thoracic findings on a frontal chest radiograph, decides whether the study is urgent, and highlights exactly where it looked.</p>
           <div class="cta">
             <button class="btn primary lg" id="cta-upload" type="button">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0L7 9m5-5 5 5M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>Upload an X-ray
@@ -241,7 +241,7 @@
   </main>
 
   <footer>
-    <p><b>Not a medical device.</b> LungLens is a research prototype and must not be used for clinical decisions.</p>
+    <p><b>Not a medical device.</b> RadiAssist is a research prototype and must not be used for clinical decisions.</p>
     <p class="muted" id="footer-version"></p>
   </footer>
 

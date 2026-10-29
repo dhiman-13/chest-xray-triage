@@ -60,4 +60,4 @@ def test_metrics_and_drift_export(client, png_bytes):
 
 def test_frontend_is_served(client):
     r = client.get("/")
-    assert r.status_code == 200 and "LungLens" in r.text
+    assert r.status_code == 200 and "RadiAssist" in r.text

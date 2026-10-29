@@ -16,4 +16,4 @@ scrape_configs:
     scheme: https
     metrics_path: /metrics
     static_configs:
-      - targets: ["YOUR-HF-USERNAME-lunglens.hf.space"]
+      - targets: ["radiassist.onrender.com"]

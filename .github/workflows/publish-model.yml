@@ -3,7 +3,7 @@ name: Publish model
 # Publishes the trained model bundle from the Kaggle training run to a public Hugging Face model
 # repo. The serving container (Render, see render.yaml) downloads it from there on boot.
 # Repo secrets: HF_TOKEN (Hugging Face, write), KAGGLE_API_TOKEN. Repo variables (optional):
-# HF_MODEL_REPO (default dhimanjatin/lunglens-model), KAGGLE_KERNEL (default jatin1313/lunglens-cxr-training-t4x2).
+# HF_MODEL_REPO (default dhimanjatin/radiassist-model), KAGGLE_KERNEL (default jatin1313/lunglens-cxr-training-t4x2).
 # Re-publish by hand from the Actions tab: "Publish model" -> "Run workflow".
 on:
   push:
@@ -19,7 +19,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  HF_MODEL_REPO: ${{ vars.HF_MODEL_REPO || 'dhimanjatin/lunglens-model' }}
+  HF_MODEL_REPO: ${{ vars.HF_MODEL_REPO || 'dhimanjatin/radiassist-model' }}
   KAGGLE_KERNEL: ${{ vars.KAGGLE_KERNEL || 'jatin1313/lunglens-cxr-training-t4x2' }}
 
 jobs:

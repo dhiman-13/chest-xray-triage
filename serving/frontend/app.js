@@ -63,7 +63,7 @@ function setTheme(theme) {
   else delete document.documentElement.dataset.theme;
   $("#theme-btn").setAttribute("aria-label", `Switch to ${light ? "dark" : "light"} theme`);
   document.querySelector('meta[name="theme-color"]').content = light ? "#f4f7fb" : "#050a13";
-  try { localStorage.setItem("lunglens-theme", theme); } catch (_) { /* private mode: theme just isn't remembered */ }
+  try { localStorage.setItem("radiassist-theme", theme); } catch (_) { /* private mode: theme just isn't remembered */ }
   if ($("#view-monitor").classList.contains("active")) loadMonitoring(); // chart colours come from CSS vars
 }
 $("#theme-btn").addEventListener("click", () => setTheme(document.documentElement.dataset.theme === "light" ? "dark" : "light"));

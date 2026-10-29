@@ -1,9 +1,9 @@
 """Publish a model bundle to a public Hugging Face model repo.
 
-    HF_TOKEN=... python deploy/publish_model.py --repo <user>/lunglens-model --bundle models/bundle
+    HF_TOKEN=... python deploy/publish_model.py --repo <user>/radiassist-model --bundle models/bundle
 
 The serving container downloads the bundle from this repo on boot (HF_MODEL_REPO), so any
-Docker host can run LungLens: Render, a Hugging Face Space, or your own machine.
+Docker host can run RadiAssist: Render, a Hugging Face Space, or your own machine.
 Model repos are free; only Docker Spaces need a paid plan.
 """
 
@@ -29,10 +29,10 @@ datasets: [nih-chest-xrays]
 pipeline_tag: image-classification
 ---
 
-# LungLens: chest X-ray triage model ({version})
+# RadiAssist: chest X-ray triage model ({version})
 
 DenseNet-121 fine-tuned on NIH ChestX-ray14 to score 14 thoracic findings, exported to ONNX with
-temperature scaling and class activation maps built in. Served by the LungLens API
+temperature scaling and class activation maps built in. Served by the RadiAssist API
 ([source](https://github.com/dhiman-13/chest-xray-triage)).
 
 | Metric | Value |

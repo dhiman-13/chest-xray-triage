@@ -1,8 +1,8 @@
-# 🫁 LungLens: Explainable Chest X-ray Triage, from Training to Monitored Production
+# 🫁 RadiAssist: Explainable Chest X-ray Triage, from Training to Monitored Production
 
 [![CI](https://github.com/dhiman-13/chest-xray-triage/actions/workflows/ci.yml/badge.svg)](https://github.com/dhiman-13/chest-xray-triage/actions/workflows/ci.yml)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/dhiman-13/chest-xray-triage/blob/main/notebooks/colab_train.ipynb)
-[![Live demo](https://img.shields.io/badge/🤗%20Live%20demo-LungLens-0d9488)](https://huggingface.co/spaces/dhimanjatin/lunglens)
+[![Live demo](https://img.shields.io/badge/Live%20demo-RadiAssist-3b82f6)](https://radiassist.onrender.com)
 
 A deep-learning system that reads a frontal chest radiograph, scores **14 thoracic findings**, explains each prediction with a **heatmap**, and sorts studies into **urgent / review / routine** so a radiologist's worklist reads the critical cases first. It is built and run like a production ML service: versioned data, tracked experiments, a model registry with a quality gate, CI/CD, a containerised API with a web frontend, and live monitoring with drift detection.
 
@@ -39,7 +39,7 @@ flowchart LR
   E -. metrics/plots .-> M
   X --> R{promote?<br/>beats champion}
   R -- yes --> H[(HF Hub<br/>model repo)]
-  subgraph Prod["Hugging Face Space (Docker)"]
+  subgraph Prod["Render (Docker)"]
     API[FastAPI + ONNX Runtime] --- UI[Web frontend]
     API --> DB[(prediction +<br/>feedback log)]
   end
@@ -106,7 +106,7 @@ serving/
   frontend/           web UI (HTML/CSS/JS, no build step)
   Dockerfile
 monitoring/           Prometheus, alert rules, Grafana dashboard, drift_report.py
-deploy/               Hugging Face Space deployment
+deploy/               Model publishing (Hugging Face Hub)
 .github/workflows/    ci.yml · cd.yml · drift-monitor.yml
 notebooks/            colab_train.ipynb
 tests/                unit, API and leakage tests
