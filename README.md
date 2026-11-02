@@ -1,14 +1,20 @@
-# 🫁 LungLens: Explainable Chest X-ray Triage, from Training to Monitored Production
+# 🫁 RadioAssist: Explainable Chest X-ray Triage, from Training to Production
 
 [![CI](https://github.com/dhiman-13/chest-xray-triage/actions/workflows/ci.yml/badge.svg)](https://github.com/dhiman-13/chest-xray-triage/actions/workflows/ci.yml)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/dhiman-13/chest-xray-triage/blob/main/notebooks/colab_train.ipynb)
-[![Live demo](https://img.shields.io/badge/🤗%20Live%20demo-LungLens-0d9488)](https://huggingface.co/spaces/YOUR-HF-USERNAME/lunglens)
+[![Live demo](https://img.shields.io/badge/Live%20demo-RadioAssist-2563eb)](https://radiassist.onrender.com/)
 
-A deep-learning system that reads a frontal chest radiograph, scores **14 thoracic findings**, explains each prediction with a **heatmap**, and sorts studies into **urgent / review / routine** so a radiologist's worklist reads the critical cases first. It is built and run like a production ML service: versioned data, tracked experiments, a model registry with a quality gate, CI/CD, a containerised API with a web frontend, and live monitoring with drift detection.
+**Live demo: [radiassist.onrender.com](https://radiassist.onrender.com/)** (upload a chest X-ray or pick a sample; the free instance may take ~30 s to wake up).
+
+A deep-learning system that reads a frontal chest radiograph, scores **14 thoracic findings**, explains each prediction with a **Grad-CAM heatmap**, and sorts studies into **urgent / review / routine** so a radiologist's worklist reads the critical cases first. It is built and run like a production ML service: versioned data, tracked experiments, a model registry with a quality gate, CI/CD and a containerised API with a web frontend.
 
 > ⚠️ Research prototype, **not a medical device**. Not for clinical use.
 
-<!-- After training, replace with your screenshot: docs/screenshot.png -->
+![RadioAssist web app](docs/screenshot.png)
+
+| Macro AUROC | Findings | Test images | Per study (CPU) |
+|:-:|:-:|:-:|:-:|
+| **0.804** (vs 0.738 published baseline) | **14** | **25,596** | **~0.3 s** |
 
 ---
 
@@ -52,20 +58,21 @@ flowchart LR
 
 ## Results
 
-Run the notebook, then paste `reports/RESULTS.md` here. Template:
+DenseNet-121 fine-tuned on NIH ChestX-ray14 (112k images) with the official **patient-level** split: 78K train / 8.5K validation / 25.6K test, trained on 2× NVIDIA T4 GPUs (Kaggle).
 
-| Model | Macro AUROC (95% CI) | Urgent-findings AUROC | ECE before → after calibration |
-|---|---|---|---|
-| Wang et al. 2017 (same official split) | 0.738 | – | – |
-| **DenseNet-121 (this work)** | _0.8xx (0.8xx–0.8xx)_ | _…_ | _… → …_ |
-| EfficientNet-B3 (this work) | _…_ | _…_ | _…_ |
+| Model | Macro AUROC (95% CI) | Test images |
+|---|---|---|
+| Wang et al. 2017 (same official split) | 0.738 | 25,596 |
+| **DenseNet-121 (this work)** | **0.804** (0.800–0.808) | 25,596 |
 
-Figures generated automatically: ROC curves, AUROC vs. published baselines, reliability diagram, Grad-CAM examples (`reports/figures/`).
+Scores are calibrated (temperature scaling fit on validation only), and per-class thresholds are tuned for **90% sensitivity** to flag urgent vs. routine cases. The model is exported to ONNX and serves a study in about 0.3 s on CPU.
+
+Running `evaluate.py` also generates ROC curves, AUROC vs. published baselines, a reliability diagram and Grad-CAM examples (`reports/figures/`).
 
 ## Quick start
 
-### 1. Train on Google Colab (T4)
-Open [`notebooks/colab_train.ipynb`](notebooks/colab_train.ipynb) in Colab, select the **T4 GPU** runtime and run the cells top to bottom. It downloads the data, trains, evaluates, exports, registers, and deploys. Everything is persisted to your Google Drive.
+### 1. Train on a free GPU (Colab T4 or Kaggle 2× T4)
+Open [`notebooks/colab_train.ipynb`](notebooks/colab_train.ipynb) in Colab, select the **T4 GPU** runtime and run the cells top to bottom. It downloads the data, trains, evaluates, exports, registers, and deploys. Everything is persisted to your Google Drive. For multi-GPU (DDP) training on Kaggle, use [`notebooks/kaggle/kaggle_train.ipynb`](notebooks/kaggle/kaggle_train.ipynb).
 
 ### 2. Run the app locally
 ```bash
